@@ -240,4 +240,3 @@ void unclip(std::vector<Point> &inPoly, std::vector<Point> &outPoly, double rati
         outPoly.push_back(pt);
     }
 }
-
