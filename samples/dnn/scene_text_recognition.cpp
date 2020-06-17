@@ -105,7 +105,7 @@ std::string decode(Mat prediction)
         }
         if (maxLoc > 0) {
             char currentChar = vocabulary[maxLoc - 1];
-            if (currentChar != decodeSeq[-1])
+            if (currentChar != decodeSeq.back())
                 decodeSeq += currentChar;
         }
     }
