@@ -93,6 +93,7 @@ int main(int argc, char** argv)
 std::string decode(Mat prediction)
 {
     std::string decodeSeq = "";
+    bool ctcFlag = true;
     for (int i = 0; i < prediction.size[0]; i++) {
         int maxLoc = 0;
         float maxScore = prediction.at<float>(i, 0);
@@ -105,8 +106,12 @@ std::string decode(Mat prediction)
         }
         if (maxLoc > 0) {
             char currentChar = vocabulary[maxLoc - 1];
-            if (currentChar != decodeSeq.back())
+            if (currentChar != decodeSeq.back() || ctcFlag) {
                 decodeSeq += currentChar;
+                ctcFlag = false;
+            }
+        } else {
+            ctcFlag = true;
         }
     }
 
