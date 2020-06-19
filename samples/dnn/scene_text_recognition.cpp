@@ -68,7 +68,7 @@ int main(int argc, char** argv)
     // Preprocess
     // Create a 4D blob from a frame
     Mat blob;
-    float scale = 1.0 / 255.0;
+    double scale = 1.0 / 255.0;
     Size inputSize = Size(100, 32);
     blob = blobFromImage(frame, scale, inputSize);
     blob -= 0.5;

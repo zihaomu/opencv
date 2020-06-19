@@ -33,7 +33,7 @@ std::string keys =
         "{ maxCandidate mc                  | 100 | Max candidates of polygons. }";
 
 
-void getTextPolygons(const Mat & binary, float binThresh, float polyThresh, uint maxCandidates,
+void getTextPolygons(const Mat & binary, float binThresh, float polyThresh, size_t maxCandidates,
                      std::vector<std::vector<Point>> & ploygons);
 
 double boxFastScore(const Mat & binary, std::vector<Point> & contour);
@@ -81,7 +81,7 @@ int main(int argc, char** argv)
 
     // Detect
     Mat frame, blob;
-    float scale = 1.0 / 255.0;
+    double scale = 1.0 / 255.0;
     Size inputSize = Size(736, 736);
     Scalar mean = Scalar(122.67891434, 116.66876762, 104.00698793);
     while (waitKey(1) < 0)
@@ -117,7 +117,7 @@ int main(int argc, char** argv)
 }
 
 
-void getTextPolygons(const Mat & binary, float binThresh, float polyThresh, uint maxCandidate,
+void getTextPolygons(const Mat & binary, float binThresh, float polyThresh, size_t maxCandidate,
                      std::vector<std::vector<Point>> & ploygons)
 {
     // Threshold
@@ -130,14 +130,14 @@ void getTextPolygons(const Mat & binary, float binThresh, float polyThresh, uint
     findContours(bitmap, contours, RETR_LIST, CHAIN_APPROX_SIMPLE);
 
     // filter for candidates
-    uint numCandidate = 0;
+    size_t numCandidate = 0;
     if (contours.size() < maxCandidate) {
         numCandidate = contours.size();
     } else {
         numCandidate = maxCandidate;
     }
 
-    for (uint i = 0; i < numCandidate; i++) {
+    for (size_t i = 0; i < numCandidate; i++) {
         std::vector<Point> contour = contours[i];
         double epsilon = arcLength(contour, true) * 0.01;
         std::vector<Point> approx;
@@ -199,22 +199,22 @@ void unclip(std::vector<Point> &inPoly, std::vector<Point> &outPoly, double rati
     double length = arcLength(inPoly, true);
     double distance = area * ratio / length;
 
-    uint numPoints = inPoly.size();
+    size_t numPoints = inPoly.size();
     std::vector<std::vector<Point2f>> newLines;
-    for (uint i = 0; i < numPoints; i++) {
+    for (size_t i = 0; i < numPoints; i++) {
         std::vector<Point2f> newLine;
         Point pt1 = inPoly[i];
         Point pt2 = inPoly[(i + 1) % numPoints];
         Point vec = pt2 - pt1;
-        double unclipDis = distance / norm(vec);
+        float unclipDis = (float)(distance / norm(vec));
         Point2f rotateVec = Point2f(-vec.y * unclipDis, vec.x * unclipDis);
         newLine.push_back(Point2f(pt1.x + rotateVec.x, pt1.y + rotateVec.y));
         newLine.push_back(Point2f(pt2.x + rotateVec.x, pt2.y + rotateVec.y));
         newLines.push_back(newLine);
     }
 
-    uint numLines = newLines.size();
-    for (uint i = 0; i < numLines; i++) {
+    size_t numLines = newLines.size();
+    for (size_t i = 0; i < numLines; i++) {
         Point2f a = newLines[i][0];
         Point2f b = newLines[i][1];
         Point2f c = newLines[(i + 1) % numLines][0];
