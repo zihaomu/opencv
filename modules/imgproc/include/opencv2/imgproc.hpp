@@ -1569,6 +1569,22 @@ CV_EXPORTS_W void blur( InputArray src, OutputArray dst,
                         Size ksize, Point anchor = Point(-1,-1),
                         int borderType = BORDER_DEFAULT );
 
+/** @brief Blurs an image using the StackBlur.
+
+The function applies and StackBlur to an image.
+StackBlur creates a kind of moving stack of colors whilst scanning through the image. Thereby it just has to add one new block of color to the right side
+of the stack and remove the leftmost color. The remaining colors on the topmost layer of the stack are either added on or reduced by one,
+depending on if they are on the right or on the left side of the stack.Described here: http://underdestruction.com/2004/02/25/stackblur-2004.
+
+Stack Blur Algorithm by Mario Klingemann <mario@quasimondo.com>
+
+@param src input image. For now, the image channel should be 1, 3 or 4. And the depth should be CV_8U only.
+@param dst output image of the same size and type as src.
+@param radius
+*/
+CV_EXPORTS_W void stackBlur(InputArray src, OutputArray dst, int radius);
+
+
 /** @brief Convolves an image with the kernel.
 
 The function applies an arbitrary linear filter to an image. In-place operation is supported. When
