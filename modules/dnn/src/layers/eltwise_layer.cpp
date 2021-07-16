@@ -71,7 +71,9 @@ public:
         PROD = 0,
         SUM = 1,
         MAX = 2,
-        DIV = 3
+        DIV = 3,
+        GREATER = 4,
+        LESS = 5
     } op;
     std::vector<float> coeffs;
 
@@ -111,6 +113,10 @@ public:
                 op = MAX;
             else if (operation == "div")
                 op = DIV;
+            else if (operation == "greater")
+                op = GREATER;
+            else if (operation == "less")
+                op = LESS;
             else
                 CV_Error(cv::Error::StsBadArg, "Unknown operation type \"" + operation + "\"");
         }
@@ -179,7 +185,8 @@ public:
                          std::vector<MatShape> &outputs,
                          std::vector<MatShape> &internals) const CV_OVERRIDE
     {
-        CV_Assert(inputs.size() >= 2);
+        size_t ninputs = inputs.size();
+        CV_Assert(ninputs >= 2 || ((op == GREATER || op == LESS) && ninputs == 1));
         CV_Assert(inputs[0].size() >= 2);
         CV_Assert(coeffs.size() == 0 || coeffs.size() == inputs.size());
         CV_Assert(op == SUM || coeffs.size() == 0);
@@ -470,6 +477,20 @@ public:
                                     dstptr[j] = std::max(srcptr0[j], srcptrI[j]);
                                 }
                             }
+                            else if (op == GREATER)
+                            {
+                                for (int j = 0; j < blockSize; j++)
+                                {
+                                    dstptr[j] = (float)(srcptr0[j] > srcptrI[j]);
+                                }
+                            }
+                            else if (op == LESS)
+                            {
+                                for (int j = 0; j < blockSize; j++)
+                                {
+                                    dstptr[j] = (float)(srcptr0[j] < srcptrI[j]);
+                                }
+                            }
                             else if (op == SUM)
                             {
                                 if (!coeffsptr || (coeffsptr[0] == 1.0f && coeffsptr[1] == 1.0f))
@@ -522,6 +543,20 @@ public:
                             for (int j = 0; j < blockSize; j++)
                             {
                                 dstptr[j] = std::max(dstptr[j], srcptrI[j]);
+                            }
+                        }
+                        else if (op == GREATER)
+                        {
+                            for (int j = 0; j < blockSize; j++)
+                            {
+                                dstptr[j] = (float)(dstptr[j] > srcptrI[j]);
+                            }
+                        }
+                        else if (op == LESS)
+                        {
+                            for (int j = 0; j < blockSize; j++)
+                            {
+                                dstptr[j] = (float)(dstptr[j] < srcptrI[j]);
                             }
                         }
                         else if (op == SUM)
@@ -641,6 +676,12 @@ public:
                 for (int i = 2; i < inputs.size(); ++i)
                     max(inputs[i], outputs[0], outputs[0]);
                 break;
+            case GREATER:
+                compare(inputs[0], inputs[1], outputs[0], CMP_GT);
+                break;
+            case LESS:
+                compare(inputs[0], inputs[1], outputs[0], CMP_LT);
+                break;
             default:
                 return false;
         }
@@ -748,6 +789,7 @@ public:
             case SUM: return cuda4dnn::EltwiseOpType::SUM;
             case PROD: return cuda4dnn::EltwiseOpType::PRODUCT;
             case DIV: return cuda4dnn::EltwiseOpType::DIV;
+            default: CV_Error(Error::StsNotImplemented, "");
             }
             return cuda4dnn::EltwiseOpType::SUM;
         }();

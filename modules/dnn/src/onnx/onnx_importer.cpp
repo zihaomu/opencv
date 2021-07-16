@@ -580,7 +580,9 @@ const std::set<String>& ONNXImporter::getSupportedTypes()
         "Dropout",
         "Identity",
         "Crop",
-        "Normalize"
+        "Normalize",
+        "Greater",
+        "Less"
     };
     return layerTypes;
 }
@@ -1025,6 +1027,16 @@ void ONNXImporter::handleNode(const opencv_onnx::NodeProto& node_proto_)
         {
             layerParams.type = "Eltwise";
             layerParams.set("operation", "max");
+        }
+        else if (layer_type == "Greater")
+        {
+            layerParams.type = "Eltwise";
+            layerParams.set("operation", "greater");
+        }
+        else if (layer_type == "Less")
+        {
+            layerParams.type = "Eltwise";
+            layerParams.set("operation", "less");
         }
         else if (layer_type == "Neg")
         {
