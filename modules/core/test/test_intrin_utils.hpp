@@ -577,6 +577,25 @@ template<typename R> struct TheTest
         return *this;
     }
 
+    TheTest & test_mul_hi()
+    {
+        // typedef typename V_RegTraits<R>::w_reg Rx2;
+        Data<R> dataA, dataB(32767);
+        R a = dataA, b = dataB;
+
+        R c = v_mul_hi(a, b);
+
+        Data<R> resC = c;
+        const int n = R::nlanes / 2;
+        for (int i = 0; i < n; ++i)
+        {
+            SCOPED_TRACE(cv::format("i=%d", i));
+            EXPECT_EQ((typename R::lane_type)((dataA[i] * dataB[i]) >> 16), resC[i]);
+        }
+
+        return *this;
+    }
+
     TheTest & test_abs()
     {
         typedef typename V_RegTraits<R>::u_reg Ru;
@@ -1466,7 +1485,7 @@ template<typename R> struct TheTest
         R r1 = vx_load_expand((const cv::float16_t*)data.a.d);
         R r2(r1);
         EXPECT_EQ(1.0f, r1.get0());
-        vx_store(data_f32.a.d, r2);
+        v_store(data_f32.a.d, r2);
         EXPECT_EQ(-2.0f, data_f32.a.d[R::nlanes - 1]);
 
         out.a.clear();
@@ -1663,6 +1682,7 @@ void test_hal_intrin_uint16()
         .test_arithm_wrap()
         .test_mul()
         .test_mul_expand()
+        .test_mul_hi()
         .test_cmp()
         .test_shift<1>()
         .test_shift<8>()
@@ -1697,6 +1717,7 @@ void test_hal_intrin_int16()
         .test_arithm_wrap()
         .test_mul()
         .test_mul_expand()
+        .test_mul_hi()
         .test_cmp()
         .test_shift<1>()
         .test_shift<8>()

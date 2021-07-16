@@ -1,6 +1,6 @@
 /*************************************************
 USAGE:
-./model_diagnostics -m <onnx file location>
+./model_diagnostics -m <model file location>
 **************************************************/
 #include <opencv2/dnn.hpp>
 #include <opencv2/core/utils/filesystem.hpp>
@@ -12,11 +12,14 @@ using namespace cv;
 using namespace dnn;
 
 
-static void diagnosticsErrorCallback(const Exception& exc)
+static
+int diagnosticsErrorCallback(int /*status*/, const char* /*func_name*/,
+                             const char* /*err_msg*/, const char* /*file_name*/,
+                             int /*line*/, void* /*userdata*/)
 {
-    CV_UNUSED(exc);
     fflush(stdout);
     fflush(stderr);
+    return 0;
 }
 
 static std::string checkFileExists(const std::string& fileName)
@@ -29,7 +32,7 @@ static std::string checkFileExists(const std::string& fileName)
 }
 
 std::string diagnosticKeys =
-        "{ model m     | | Path to the model .onnx file. }"
+        "{ model m     | | Path to the model file. }"
         "{ config c    | | Path to the model configuration file. }"
         "{ framework f | | [Optional] Name of the model framework. }";
 
@@ -38,7 +41,7 @@ std::string diagnosticKeys =
 int main( int argc, const char** argv )
 {
     CommandLineParser argParser(argc, argv, diagnosticKeys);
-    argParser.about("Use this tool to run the diagnostics of provided ONNX model"
+    argParser.about("Use this tool to run the diagnostics of provided ONNX/TF model"
                     "to obtain the information about its support (supported layers).");
 
     if (argc == 1)
@@ -54,7 +57,7 @@ int main( int argc, const char** argv )
     CV_Assert(!model.empty());
 
     enableModelDiagnostics(true);
-    redirectError((ErrorCallback)diagnosticsErrorCallback, NULL);
+    redirectError(diagnosticsErrorCallback, NULL);
 
     Net ocvNet = readNet(model, config, frameworkId);
 

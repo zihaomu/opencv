@@ -20,6 +20,9 @@
 #include <opencv2/core/utils/configuration.private.hpp>
 #include <opencv2/core/utils/logger.hpp>
 
+#include "opencv2/core/utils/filesystem.hpp"
+#include "opencv2/core/utils/filesystem.private.hpp"
+
 namespace cv { namespace dnn {
 
 #ifdef HAVE_DNN_NGRAPH
@@ -654,7 +657,11 @@ void InfEngineNgraphNet::initPlugin(InferenceEngine::CNNNetwork& net)
                 try
                 {
                     InferenceEngine::IExtensionPtr extension =
+#if INF_ENGINE_VER_MAJOR_GE(INF_ENGINE_RELEASE_2021_4)
+                        std::make_shared<InferenceEngine::Extension>(libName);
+#else
                         InferenceEngine::make_so_pointer<InferenceEngine::IExtension>(libName);
+#endif
 
                     ie.AddExtension(extension, "CPU");
                     CV_LOG_INFO(NULL, "DNN-IE: Loaded extension plugin: " << libName);
@@ -683,6 +690,23 @@ void InfEngineNgraphNet::initPlugin(InferenceEngine::CNNNetwork& net)
                 ie.SetConfig({{
                     InferenceEngine::PluginConfigParams::KEY_CPU_THREADS_NUM, format("%d", getNumThreads()),
                 }}, device_name);
+#endif
+#if INF_ENGINE_VER_MAJOR_GE(INF_ENGINE_RELEASE_2021_2)
+            if (device_name.find("GPU") == 0)
+            {
+#if OPENCV_HAVE_FILESYSTEM_SUPPORT
+                std::string cache_path = utils::fs::getCacheDirectory((std::string("dnn_ie_cache_") + device_name).c_str(), "OPENCV_DNN_IE_GPU_CACHE_DIR");
+#else
+                std::string cache_path = utils::getConfigurationParameterString("OPENCV_DNN_IE_GPU_CACHE_DIR", "");
+#endif
+                if (!cache_path.empty() && cache_path != "disabled")
+                {
+                    CV_LOG_INFO(NULL, "OpenCV/nGraph: using GPU kernels cache: " << cache_path);
+                    ie.SetConfig({{
+                        InferenceEngine::PluginConfigParams::KEY_CACHE_DIR, cache_path,
+                    }}, device_name);
+                }
+            }
 #endif
         }
         std::map<std::string, std::string> config;
@@ -985,35 +1009,54 @@ void InfEngineNgraphNet::forward(const std::vector<Ptr<BackendWrapper> >& outBlo
         reqWrapper->req.SetInput(inpBlobs);
         reqWrapper->req.SetOutput(outBlobs);
 
+#if INF_ENGINE_VER_MAJOR_GE(INF_ENGINE_RELEASE_2021_4)
+        InferenceEngine::InferRequest infRequest = reqWrapper->req;
+        NgraphReqWrapper* wrapperPtr = reqWrapper.get();
+        CV_Assert(wrapperPtr && "Internal error");
+#else
         InferenceEngine::IInferRequest::Ptr infRequestPtr = reqWrapper->req;
-        infRequestPtr->SetUserData(reqWrapper.get(), 0);
+        CV_Assert(infRequestPtr);
+        InferenceEngine::IInferRequest& infRequest = *infRequestPtr.get();
+        infRequest.SetUserData(reqWrapper.get(), 0);
+#endif
 
-        infRequestPtr->SetCompletionCallback(
-            [](InferenceEngine::IInferRequest::Ptr request, InferenceEngine::StatusCode status)
+#if INF_ENGINE_VER_MAJOR_GE(INF_ENGINE_RELEASE_2021_4)
+        // do NOT capture 'reqWrapper' (smart ptr) in the lambda callback
+        infRequest.SetCompletionCallback<std::function<void(InferenceEngine::InferRequest, InferenceEngine::StatusCode)>>(
+            [wrapperPtr](InferenceEngine::InferRequest /*request*/, InferenceEngine::StatusCode status)
+#else
+        infRequest.SetCompletionCallback(
+            [](InferenceEngine::IInferRequest::Ptr requestPtr, InferenceEngine::StatusCode status)
+#endif
             {
                 CV_LOG_DEBUG(NULL, "DNN(nGraph): completionCallback(" << (int)status << ")");
+#if !INF_ENGINE_VER_MAJOR_GE(INF_ENGINE_RELEASE_2021_4)
+                CV_Assert(requestPtr);
+                InferenceEngine::IInferRequest& request = *requestPtr.get();
 
-                NgraphReqWrapper* wrapper;
-                request->GetUserData((void**)&wrapper, 0);
-                CV_Assert(wrapper && "Internal error");
+                NgraphReqWrapper* wrapperPtr;
+                request.GetUserData((void**)&wrapperPtr, 0);
+                CV_Assert(wrapperPtr && "Internal error");
+#endif
+                NgraphReqWrapper& wrapper = *wrapperPtr;
 
                 size_t processedOutputs = 0;
                 try
                 {
-                    for (; processedOutputs < wrapper->outProms.size(); ++processedOutputs)
+                    for (; processedOutputs < wrapper.outProms.size(); ++processedOutputs)
                     {
-                        const std::string& name = wrapper->outsNames[processedOutputs];
-                        Mat m = ngraphBlobToMat(wrapper->req.GetBlob(name));
+                        const std::string& name = wrapper.outsNames[processedOutputs];
+                        Mat m = ngraphBlobToMat(wrapper.req.GetBlob(name));
 
                         try
                         {
                             CV_Assert(status == InferenceEngine::StatusCode::OK);
-                            wrapper->outProms[processedOutputs].setValue(m.clone());
+                            wrapper.outProms[processedOutputs].setValue(m.clone());
                         }
                         catch (...)
                         {
                             try {
-                                wrapper->outProms[processedOutputs].setException(std::current_exception());
+                                wrapper.outProms[processedOutputs].setException(std::current_exception());
                             } catch(...) {
                                 CV_LOG_ERROR(NULL, "DNN: Exception occurred during async inference exception propagation");
                             }
@@ -1023,16 +1066,16 @@ void InfEngineNgraphNet::forward(const std::vector<Ptr<BackendWrapper> >& outBlo
                 catch (...)
                 {
                     std::exception_ptr e = std::current_exception();
-                    for (; processedOutputs < wrapper->outProms.size(); ++processedOutputs)
+                    for (; processedOutputs < wrapper.outProms.size(); ++processedOutputs)
                     {
                         try {
-                            wrapper->outProms[processedOutputs].setException(e);
+                            wrapper.outProms[processedOutputs].setException(e);
                         } catch(...) {
                             CV_LOG_ERROR(NULL, "DNN: Exception occurred during async inference exception propagation");
                         }
                     }
                 }
-                wrapper->isReady = true;
+                wrapper.isReady = true;
             }
         );
     }
