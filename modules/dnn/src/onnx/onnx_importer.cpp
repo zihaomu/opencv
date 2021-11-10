@@ -469,6 +469,7 @@ void ONNXImporter::addLayer(LayerParams& layerParams,
                             const opencv_onnx::NodeProto& node_proto)
 {
     int depth = layerParams.get<int>("depth", CV_32F);
+    // 这一层添加Layer，并发回layer对应的ID
     int id = dstNet.addLayer(layerParams.name, layerParams.type, depth, layerParams);
     for (int i = 0; i < node_proto.output_size(); ++i)
     {
@@ -477,11 +478,15 @@ void ONNXImporter::addLayer(LayerParams& layerParams,
 
     std::vector<MatShape> layerInpShapes, layerOutShapes, layerInternalShapes;
     int inpNum = 0;
+
+    // 创建好layer之后，需要将本层的输入与其相连。
     for (int j = 0; j < node_proto.input_size(); j++)
     {
         const std::string& input_name = node_proto.input(j);
         IterLayerId_t layerId = layer_id.find(input_name);
         if (layerId != layer_id.end()) {
+
+            // layerId是输入层的ID
             dstNet.connect(layerId->second.layerId, layerId->second.outputId, id, inpNum);
             ++inpNum;
             // Collect input shapes.

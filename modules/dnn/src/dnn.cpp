@@ -1198,6 +1198,7 @@ struct Net::Impl : public detail::NetImplBase
     bool skipInfEngineInit;
     bool hasDynamicShapes;
     // Map host data to backend specific wrapper.
+    // 这里会存放所有使用的Mat对应不同后端的Wrappers，这样肯定会导致内存使用太多。
     std::map<void*, Ptr<BackendWrapper> > backendWrappers;
 
     int lastLayerId;
@@ -1222,6 +1223,7 @@ struct Net::Impl : public detail::NetImplBase
     std::unique_ptr<CudaInfo_t> cudaInfo;
 #endif
 
+    // wrap可以将Mat转移到不同的平台。
     Ptr<BackendWrapper> wrap(Mat& host)
     {
         if (preferableBackend == DNN_BACKEND_OPENCV && preferableTarget == DNN_TARGET_CPU)
@@ -1232,6 +1234,9 @@ struct Net::Impl : public detail::NetImplBase
             shape[i] = host.size[i];
 
         void* data = host.data;
+
+        // 下面是为了寻找如果一个Mat host已经存在于对应的backendWrappers，就直接使用baseBuffer提取到目前在不同平台中的矩阵。
+        // baseBuffer你也可以不使用。
         if (backendWrappers.find(data) != backendWrappers.end())
         {
             Ptr<BackendWrapper> baseBuffer = backendWrappers[data];
@@ -1588,6 +1593,7 @@ struct Net::Impl : public detail::NetImplBase
         return pins;
     }
 
+    // connect目的是在输入层中添加输出成的consumers中添加输入层的ID，并在输入层中添加输出层的连接。
     void connect(int outLayerId, int outNum, int inLayerId, int inNum)
     {
         CV_Assert(outLayerId < inLayerId);
@@ -2132,6 +2138,7 @@ struct Net::Impl : public detail::NetImplBase
 
             bool fused = ld.skip;
             Ptr<Layer> layer = ld.layerInstance;
+            // 如果本层不支持backend，并且不支持fused
             if (!fused && !layer->supportBackend(preferableBackend))
             {
                 bool customizable = ld.id != 0 && supportsCPUFallback;
@@ -2465,6 +2472,8 @@ struct Net::Impl : public detail::NetImplBase
 #endif
     }
 
+    // 这里分配单层的memory
+    // 分配的意思是：对于无法重用的层，就创建新的空间。对于GPU等平台，会用wrapMat为其对应的平台下创建专属的Mat。
     void allocateLayer(int lid, const LayersShapesMap& layersShapes)
     {
         CV_TRACE_FUNCTION();
@@ -2503,6 +2512,7 @@ struct Net::Impl : public detail::NetImplBase
             allocateLayer(*i, layersShapes);
 
         //bind inputs
+        // 一个层的输入层有两个来源，一个是从参数中来，一个是由上一层的输出。
         if (ld.id == 0)  // DataLayer
         {
             ninputs = netInputLayer->inputsData.size();
@@ -2512,6 +2522,7 @@ struct Net::Impl : public detail::NetImplBase
         }
         else
         {
+            // 这里是从上一层的输出中来。
             ld.inputBlobs.resize(ninputs);
             ld.inputBlobsWrappers.resize(ninputs);
             for (size_t i = 0; i < ninputs; i++)
@@ -2520,7 +2531,7 @@ struct Net::Impl : public detail::NetImplBase
                 CV_Assert(from.valid());
                 CV_DbgAssert(layers.count(from.lid) && (int)layers[from.lid].outputBlobs.size() > from.oid);
                 ld.inputBlobs[i] = &layers[from.lid].outputBlobs[from.oid];
-                ld.inputBlobsWrappers[i] = layers[from.lid].outputBlobsWrappers[from.oid];
+                ld.inputBlobsWrappers[i] = layers[from.lid].outputBlobsWrappers[from.oid]; // 上一层的输出，是这一层的输入。
             }
         }
 
@@ -2534,8 +2545,14 @@ struct Net::Impl : public detail::NetImplBase
         std::vector<LayerPin> pinsForInternalBlobs;
         blobManager.allocateBlobsForLayer(ld, layerShapesIt->second, pinsForInternalBlobs);
         ld.outputBlobsWrappers.resize(ld.outputBlobs.size());
+
+        // 下面是对输出层的内存变换，这里需要注意，这里的outputBlobs并不是最后的输出，这里只是为了计算出输出矩阵的地址。
+        // 是否已经把输出矩阵地址转移到了对应的机器中呢？答案是有，因为对于内存复用，在不同机器中的原理是一样的。
+        // 比如说，A-》B是内存复用，而在运算是在GPU上进行，则需要先通过wrapMat将矩阵从CPU-》GPU。
+        // 转移好之后，计算在GPU中，也同样使用同一片内存。所以，wrapMat对应的区域是一样的。
+        // 但是这样做的不好是，内存分配了两套，CPU和GPU中同时存在。
         for (int i = 0; i < ld.outputBlobs.size(); ++i)
-            ld.outputBlobsWrappers[i] = wrap(ld.outputBlobs[i]);
+            ld.outputBlobsWrappers[i] = wrap(ld.outputBlobs[i]); 
 
         /* CUDA backend has its own system for internal blobs; we don't need these */
         ld.internalBlobsWrappers.resize((preferableBackend == DNN_BACKEND_CUDA) ? 0 : ld.internals.size());
