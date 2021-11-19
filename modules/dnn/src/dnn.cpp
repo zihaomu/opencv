@@ -4084,6 +4084,7 @@ int Net::addLayer(const String &name, const String &type, const int &dtype, Laye
     if (params.get<bool>("has_dynamic_shapes", false))
         impl->hasDynamicShapes = true;
 
+    // 对于量化层，需要在这里设置was quantize的flag
     if (dtype == CV_8S)
         impl->netWasQuantized = true;
 

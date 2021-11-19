@@ -15,6 +15,9 @@
 #define CV_LOG_STRIP_LEVEL CV_LOG_LEVEL_DEBUG + 1
 #include <opencv2/core/utils/logger.hpp>
 
+// For Comment
+#define HAVE_PROTOBUF
+
 #ifdef HAVE_PROTOBUF
 
 #include <iostream>
@@ -81,6 +84,7 @@ protected:
     opencv_onnx::GraphProto graph_proto;
     std::string framework_name;
 
+    // constBlobs存储所有的const值元素。
     std::map<std::string, Mat> constBlobs;
 
     std::map<std::string, MatShape> outShapes;  // List of internal blobs shapes.
@@ -305,6 +309,8 @@ static DictValue parseStr(const ::google::protobuf::RepeatedPtrField< ::std::str
     return DictValue::arrayString(src.begin(), static_cast<int>(src.size()));
 }
 
+// DNN层的预处理阶段。
+// 通过找规律，读取每一个onnx node的每一条属性，然后作为参数，设定到DNN层的定义中。
 LayerParams ONNXImporter::getLayerParams(const opencv_onnx::NodeProto& node_proto)
 {
     LayerParams lp;
@@ -541,6 +547,9 @@ void ONNXImporter::addConstant(const std::string& name, const Mat& blob)
     outShapes.insert(std::make_pair(name, shape(blob)));
 }
 
+// 这里针对量化层做处理，
+// ONNX由QLinear开头的层，均为量化层，有个特点是output结尾是quantized字符串，通过这一点确定是否是量化层。
+// 除此之外还要处理量化层的scale和zeropoint两个参数。
 void ONNXImporter::handleQuantizedNode(LayerParams& layerParams,
                                        const opencv_onnx::NodeProto& node_proto)
 {
@@ -555,6 +564,9 @@ void ONNXImporter::handleQuantizedNode(LayerParams& layerParams,
         outName = outName.substr(0, len - 9);
         Mat scale, zeropoint;
 
+        // 如果scale和zeropoint已经保存在constBlobs中，可拼凑出scale和zeropoint的名字来获取其值
+
+        // 这里要说明一下，constBlobs值是在初始化过程中设定好的
         if (constBlobs.find(outName + "scale") != constBlobs.end() &&
             constBlobs.find(outName + "zero_point") != constBlobs.end())
         {
@@ -563,6 +575,8 @@ void ONNXImporter::handleQuantizedNode(LayerParams& layerParams,
         }
         else
         {
+            // 如果没有获取，就手动设置将当前层的输入的scale zeropoint全部作为out的值。是否正确？
+            // 应该只有两层会走到这里，是Quant和DeQuant
             std::string inpName = node_proto.input(0);
             inpName = inpName.substr(0, inpName.length() - 9);
             scale = getBlob(inpName + "scale");
@@ -756,6 +770,7 @@ void ONNXImporter::parseMaxPool(LayerParams& layerParams, const opencv_onnx::Nod
 
 void ONNXImporter::parseAveragePool(LayerParams& layerParams, const opencv_onnx::NodeProto& node_proto)
 {
+    // 这里为什么没PoolingInt8？
     layerParams.type = "Pooling";
     layerParams.set("pool", "AVE");
     layerParams.set("ceil_mode", layerParams.has("pad_mode"));
@@ -2659,8 +2674,12 @@ void ONNXImporter::parseQEltwise(LayerParams& layerParams, const opencv_onnx::No
             if (blob.dims == 2)
                 blob = blob.t();
 
+            // 如果加法中两个元素的shape相等，先将第一个元素保存在Const Layer中。
             if (shape(blob) == inpShape)
             {
+                // 这里为什么需要增加一层ConstInt8？
+                // 主要参考前面parseBias的代码部分，通过ConstInt8对即将相加的两个blob进行处理。
+                // 在这里主要是设定depth，scale和zeropoint这写参数。
                 LayerParams constParams;
                 constParams.name = layerParams.name + "/const";
                 constParams.type = "ConstInt8";
@@ -2672,6 +2691,7 @@ void ONNXImporter::parseQEltwise(LayerParams& layerParams, const opencv_onnx::No
                 int id = dstNet.addLayer(constParams.name, constParams.type, CV_8S, constParams);
                 layer_id.insert(std::make_pair(constParams.name, LayerInfo(id, 0)));
                 outShapes[constParams.name] = shape(blob);
+                // 下面是设定onnx模型的输入，这将会在本层结尾处进行解析时，将刚刚设定的Const加入到本层的Input
                 node_proto.set_input(constId, constParams.name);
 
                 layerParams.type = "EltwiseInt8";
@@ -2769,6 +2789,7 @@ void ONNXImporter::parseQSigmoid(LayerParams& layerParams, const opencv_onnx::No
     addLayer(layerParams, node_proto);
 }
 
+// 上面的Pooling在这里
 void ONNXImporter::parseQAvgPool(LayerParams& layerParams, const opencv_onnx::NodeProto& node_proto)
 {
     CV_Assert(node_proto.input_size() == 5);
