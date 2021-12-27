@@ -576,7 +576,7 @@ struct LayerData
     LayerParams params;
 
     std::vector<LayerPin> inputBlobsId;
-    std::set<int> inputLayersId;
+    std::set<int> inputLayersId;  // 输入layer的ID 列表
     std::set<int> requiredOutputs;
     std::vector<LayerPin> consumers;
     std::vector<Ptr<BackendWrapper> > outputBlobsWrappers;
@@ -989,6 +989,8 @@ public:
         const ShapesVec& outShapes = layerShapes.out,
                 internalShapes = layerShapes.internal;
 
+        // 这一层的outputShapes.size保存着output的数量，在每个layer 的getMemory 函数中确定。
+        // 第一步确定有多少个outputBlobs
         outputBlobs.resize(std::max((size_t)1, outShapes.size())); //layer produce at least one output blob
         internalBlobs.resize(internalShapes.size());
 
@@ -1040,6 +1042,7 @@ public:
                 int index = it->second[j];
                 if (total(shapes[index]))
                 {
+                    // 复用，下一层的
                     LayerPin blobPin(ld.id, index);
                     if (index < outShapes.size() && inPlace)
                     {
@@ -1048,6 +1051,7 @@ public:
                         reuse(ld.inputBlobsId[0], blobPin);
                     }
                     else
+                        // 创建或者复用上一层的blob
                         reuseOrCreate(shapes[index], blobPin, *blobs[index], ld.dtype);
                 }
             }
@@ -1187,7 +1191,7 @@ struct Net::Impl : public detail::NetImplBase
         hasDynamicShapes = false;
     }
 
-    Ptr<DataLayer> netInputLayer;
+    Ptr<DataLayer> netInputLayer;  // 专门为input设定的DataLayer
     std::vector<LayerPin> blobsToKeep;
     MapIdToLayerData layers;
     std::map<String, int> layerNameToId;
@@ -2474,6 +2478,7 @@ struct Net::Impl : public detail::NetImplBase
 
     // 这里分配单层的memory
     // 分配的意思是：对于无法重用的层，就创建新的空间。对于GPU等平台，会用wrapMat为其对应的平台下创建专属的Mat。
+    // lid：layer ID, layersShape是所有层的输入和输出的shapes
     void allocateLayer(int lid, const LayersShapesMap& layersShapes)
     {
         CV_TRACE_FUNCTION();
@@ -2508,9 +2513,11 @@ struct Net::Impl : public detail::NetImplBase
             ld.inputLayersId.insert(ld.inputBlobsId[i].lid);
 
         //allocate parents
+        // 分配当前层之前，先分配好其需要的inputLayersId对应所需要的layer ID 列表
         for (set<int>::iterator i = ld.inputLayersId.begin(); i != ld.inputLayersId.end(); i++)
             allocateLayer(*i, layersShapes);
 
+        // *** 第一步：确定输入的blob
         //bind inputs
         // 一个层的输入层有两个来源，一个是从参数中来，一个是由上一层的输出。
         if (ld.id == 0)  // DataLayer
@@ -2543,6 +2550,8 @@ struct Net::Impl : public detail::NetImplBase
             ld.dtype = CV_16S;
 
         std::vector<LayerPin> pinsForInternalBlobs;
+        // 这个是实际的内存分配函数。
+        // *** 第二步：确定输出的blob，和internal的Blob
         blobManager.allocateBlobsForLayer(ld, layerShapesIt->second, pinsForInternalBlobs);
         ld.outputBlobsWrappers.resize(ld.outputBlobs.size());
 
@@ -3150,6 +3159,8 @@ struct Net::Impl : public detail::NetImplBase
         }
     }
 
+
+    // 在这里分配层的内存，以及input和output绑定
     void allocateLayers(const std::vector<LayerPin>& blobsToKeep_)
     {
         CV_TRACE_FUNCTION();
@@ -3160,6 +3171,9 @@ struct Net::Impl : public detail::NetImplBase
 
         CV_Assert(!layers[0].outputBlobs.empty());
         ShapesVec inputShapes;
+
+        // layers[0]一般是layer的输入，其输出只是转换一下数据格式。
+        // 对于多输入的模型， layer[0].outputBlobs.size将会决定有多少个输入。
         for(int i = 0; i < layers[0].outputBlobs.size(); i++)
         {
             Mat& inp = layers[0].outputBlobs[i];
@@ -3170,8 +3184,11 @@ struct Net::Impl : public detail::NetImplBase
             {
                 layers[0].outputBlobs[i].create(inp.dims, inp.size, CV_16S);
             }
+            // 放进去input的shape
             inputShapes.push_back(shape(inp));
         }
+
+        // 下面会计算每一层的输入输出维度，从而用于内存分配。
         LayersShapesMap layersShapes;
         getLayersShapes(inputShapes, layersShapes);
 
@@ -3187,19 +3204,23 @@ struct Net::Impl : public detail::NetImplBase
         }
 
         // Fake references to input blobs.
+        // 加入输入引用。
         for (int i = 0; i < layers[0].outputBlobs.size(); ++i)
             blobManager.addReference(LayerPin(0, i));
+        // 加入每一层输入的引用。
         for (it = layers.begin(); it != layers.end(); ++it)
         {
             const LayerData& ld = it->second;
             blobManager.addReferences(ld.inputBlobsId);
         }
 
+        // 需要保持内存的Mat ref+1
         for (int i = 0; i < blobsToKeep_.size(); i++)
         {
             blobManager.addReference(blobsToKeep_[i]);
         }
 
+        // *** 根据每一层的layer id 分配layer shape。
         for (it = layers.begin(); it != layers.end(); it++)
         {
             int lid = it->first;
@@ -3499,8 +3520,10 @@ struct Net::Impl : public detail::NetImplBase
     {
         std::vector<LayerPin>& inputLayerIds = layers[id].inputBlobsId;
 
+        // id是0，输入shape是空，说明要重建输入shape
         if (id == 0 && inOutShapes[id].in[0].empty())
         {
+            // 如果outputBlobs非空，就把输出的shape当作输入对shape
             if (!layers[0].outputBlobs.empty())
             {
                 ShapesVec shapes;
@@ -3524,18 +3547,22 @@ struct Net::Impl : public detail::NetImplBase
                         break;
                     }
                 }
+
                 if (none)
-                {
+                {   // 本层不需要分配内存，退出
                     inOutShapes[0].out.clear();
                     return;
                 }
                 else
                 {
+                    // 将设定好的netInputLayer->shapes参数重的inputShape拿过来用
                     inOutShapes[0].in = inputShapes;
                 }
             }
         }
 
+        // 如果当前层的输入是空的，说明是未分配状态。
+        // 第一步确定inputShape。
         if (inOutShapes[id].in.empty())
         {
             for(int i = 0; i < inputLayerIds.size(); i++)
@@ -3561,6 +3588,7 @@ struct Net::Impl : public detail::NetImplBase
         bool layerSupportInPlace = false;
         try
         {
+            // 下面这个函数专门根据input shape计算output shape的函数，每层必须重载getMemoryShapes从而计算对应的output shape
             layerSupportInPlace = l->getMemoryShapes(is, requiredOutputs, os, ints);
         }
         catch (const cv::Exception& e)
@@ -3593,6 +3621,7 @@ struct Net::Impl : public detail::NetImplBase
             CV_Assert(total(os[i]) > 0);
     }
 
+    // 这是获取整个net的输入和输出。
     void getLayersShapes(const ShapesVec& netInputShapes,
                          LayersShapesMap& inOutShapes)
     {
@@ -3606,11 +3635,13 @@ struct Net::Impl : public detail::NetImplBase
         }
     }
 
+    // 这是获取某一层的输入输出shape
     void getLayerShapes(const ShapesVec& netInputShapes,
                         const int layerId,
                         LayerShapes& shapes)
     {
         LayersShapesMap inOutShapes;
+        // 这里要是有多个输入，该怎么确定输入？
         inOutShapes[0].in = netInputShapes; //insert shape for first input layer
         getLayerShapesRecursively(layerId, inOutShapes);
         shapes = inOutShapes[layerId];
