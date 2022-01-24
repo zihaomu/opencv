@@ -1318,6 +1318,7 @@ void ONNXImporter::parseSplit(LayerParams& layerParams, const opencv_onnx::NodeP
     addLayer(layerParams, node_proto);
 }
 
+// 这一层是所有加减法走的路径。
 void ONNXImporter::parseBias(LayerParams& layerParams, const opencv_onnx::NodeProto& node_proto_)
 {
     opencv_onnx::NodeProto node_proto = node_proto_;
@@ -1346,7 +1347,7 @@ void ONNXImporter::parseBias(LayerParams& layerParams, const opencv_onnx::NodePr
 
     bool is_const_0 = layer_id.find(node_proto.input(0)) == layer_id.end();
     bool is_const_1 = layer_id.find(node_proto.input(1)) == layer_id.end();
-    if (is_const_0 && is_const_1)
+    if (is_const_0 && is_const_1) // 如果两个都是const，就直接计算。
     {
         Mat blob_0 = getBlob(node_proto, 0);
         Mat blob_1 = getBlob(node_proto, 1);
@@ -1365,6 +1366,7 @@ void ONNXImporter::parseBias(LayerParams& layerParams, const opencv_onnx::NodePr
         const float inputScale = isSub && is_const_0 ? -1.f : 1.f;
         const float constScale = isSub && is_const_1 ? -1.f : 1.f;
 
+        // 如果一个值是一个scale
         if (blob_total == 1) {
             layerParams.type = "Power";
             layerParams.set("scale", inputScale);
@@ -1372,7 +1374,7 @@ void ONNXImporter::parseBias(LayerParams& layerParams, const opencv_onnx::NodePr
         }
         else {
             MatShape inpShape = outShapes[node_proto.input(input_id)];
-            if (shape(blob) == inpShape)
+            if (shape(blob) == inpShape)  // 如果两边的shape相同。
             {
                 LayerParams constParams;
                 constParams.name = layerParams.name + "/const";
@@ -1388,7 +1390,7 @@ void ONNXImporter::parseBias(LayerParams& layerParams, const opencv_onnx::NodePr
                 node_proto.set_input(const_blob_id, constParams.name);
             }
             else
-            {
+            {  // 只剩下vector
                 if (inputScale < 0.f)
                 {
                     addNegation(layerParams, node_proto, input_id);
@@ -1400,7 +1402,7 @@ void ONNXImporter::parseBias(LayerParams& layerParams, const opencv_onnx::NodePr
                 for (int i = 0; i < graph_proto.initializer_size(); i++)
                 {
                     opencv_onnx::TensorProto tensor_proto = graph_proto.initializer(i);
-                    if (tensor_proto.name() == node_proto.input(const_blob_id))
+                    if (tensor_proto.name() == node_proto.input(const_blob_id))  // 这是在寻找哪个维度是bias
                     {
                         axis = inpShape.size() - tensor_proto.dims_size();
                         break;
@@ -1412,7 +1414,7 @@ void ONNXImporter::parseBias(LayerParams& layerParams, const opencv_onnx::NodePr
             }
         }
     }
-    else if (outShapes[node_proto.input(0)] == outShapes[node_proto.input(1)])
+    else if (outShapes[node_proto.input(0)] == outShapes[node_proto.input(1)])  // 如果两个mat的shape都是相同
     {
         layerParams.type = "Eltwise";
         if (isSub)
@@ -1422,7 +1424,7 @@ void ONNXImporter::parseBias(LayerParams& layerParams, const opencv_onnx::NodePr
         }
     }
     else
-    {
+    {   // 默认是vector
         if (isSub)
         {
             addNegation(layerParams, node_proto, 1);
@@ -1881,7 +1883,7 @@ void ONNXImporter::parseMul(LayerParams& layerParams, const opencv_onnx::NodePro
         else
             haveVariables = true;
     }
-    if (constId != -1 && haveVariables)
+    if (constId != -1 && haveVariables)  // 如果有常量
     {
         Mat blob = getBlob(node_proto, constId);
         blob = blob.reshape(1, 1);
@@ -1956,7 +1958,7 @@ void ONNXImporter::parseMul(LayerParams& layerParams, const opencv_onnx::NodePro
         addConstant(layerParams.name, out);
         return;
     }
-    else if (outShapes[node_proto.input(0)] == outShapes[node_proto.input(1)])
+    else if (outShapes[node_proto.input(0)] == outShapes[node_proto.input(1)])  // 两边shape相等。
     {
         layerParams.type = "Eltwise";
         layerParams.set("operation", isDiv ? "div" : "prod");
