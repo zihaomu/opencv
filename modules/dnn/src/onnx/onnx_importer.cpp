@@ -1376,24 +1376,16 @@ void ONNXImporter::parseBias(LayerParams& layerParams, const opencv_onnx::NodePr
             layerParams.set("shift", constScale * blob.ptr<float>()[0]);
         }
         else {
-            MatShape inpShape = outShapes[node_proto.input(input_id)];
-            if (shape(blob) == inpShape)
-            {
-                LayerParams constParams;
-                constParams.name = layerParams.name + "/const";
-                constParams.type = "Const";
-                constParams.blobs.push_back(blob);
-                int id = dstNet.addLayer(constParams.name, constParams.type, constParams);
-                layer_id.insert(std::make_pair(constParams.name, LayerInfo(id, 0)));
-                outShapes[constParams.name] = shape(blob);
+            MatShape blobShape = shape(blob);
 
-                layerParams.type = "Eltwise";
-                float coeffs[] = {1., isSub ? -1.f : 1.f};
-                layerParams.set("coeff", DictValue::arrayReal<float*>(coeffs, 2));
-                node_proto.set_input(const_blob_id, constParams.name);
-            }
-            else
+            // TODO!: This could be deleted when blob shape can correctly represent one-dimensional Mat.
+            // For now, if the input is vector with size of [2], it will be parsed by opencv to size of [2, 1].
+            // And this will cause broadcast fail.
+            // For example, two input size of [1, 2] and [2], the right output size is [1, 2], but the broadcast will output the [2, 2].
+            // So the temporary solution for this case is to use the Scale layer instead of Eltwise layer.
+            if(blobShape.size() == 2 && blobShape[1] == 1)
             {
+                MatShape inpShape = outShapes[node_proto.input(input_id)];
                 if (inputScale < 0.f)
                 {
                     addNegation(layerParams, node_proto, input_id);
@@ -1414,11 +1406,53 @@ void ONNXImporter::parseBias(LayerParams& layerParams, const opencv_onnx::NodePr
                 layerParams.set("axis", axis);
                 blob = blob.reshape(1, 1);
                 layerParams.blobs.push_back(constScale * blob);
+            }else
+            {
+                // set const Blob
+                LayerParams constParams;
+                constParams.name = layerParams.name + "/const";
+                constParams.type = "Const";
+                constParams.blobs.push_back(blob);
+                int id = dstNet.addLayer(constParams.name, constParams.type, constParams);
+                layer_id.insert(std::make_pair(constParams.name, LayerInfo(id, 0)));
+
+                node_proto.set_input(const_blob_id, constParams.name);
+                outShapes[constParams.name] = shape(blob);
+
+                layerParams.type = "Eltwise";
+
+                if (node_proto.input_size() == 2)
+                {
+                    if( outShapes[node_proto.input(0)] != outShapes[node_proto.input(1)])
+                    {
+                        std::vector<int> inputList = {0, 1};
+                        addBroadcasting(node_proto, inputList, layerParams);
+                    }
+
+                    if (isSub)
+                    {
+                        static float subCoeffs[] = {1.f, -1.f};
+                        layerParams.set("coeff", DictValue::arrayReal<float*>(subCoeffs, 2));
+                    }
+                }
+                else {
+                    std::vector<int> inputList;
+                    for (int i = 0; i < node_proto.input_size(); i++) {
+                        inputList.push_back(i);
+                    }
+                    addBroadcasting(node_proto, inputList, layerParams);
+                }
             }
         }
     }
-    else if (outShapes[node_proto.input(0)] == outShapes[node_proto.input(1)])
+    else if (node_proto.input_size() == 2)
     {
+        if( outShapes[node_proto.input(0)] != outShapes[node_proto.input(1)])
+        {
+            std::vector<int> inputList = {0, 1};
+            addBroadcasting(node_proto, inputList, layerParams);
+        }
+
         layerParams.type = "Eltwise";
         if (isSub)
         {
@@ -1428,12 +1462,19 @@ void ONNXImporter::parseBias(LayerParams& layerParams, const opencv_onnx::NodePr
     }
     else
     {
-        if (isSub)
+        std::vector<int> inputList;
+        for(int i = 0; i< node_proto.input_size(); i++)
         {
-            addNegation(layerParams, node_proto, 1);
+            inputList.push_back(i);
         }
-        layerParams.type = "Scale";
-        layerParams.set("bias_term", true);
+        addBroadcasting(node_proto, inputList, layerParams);
+        layerParams.type = "Eltwise";
+//        if (isSub)
+//        {
+//            addNegation(layerParams, node_proto, 1);
+//        }
+//        layerParams.type = "Scale";
+//        layerParams.set("bias_term", true);
     }
     addLayer(layerParams, node_proto);
 }
@@ -1454,8 +1495,50 @@ void ONNXImporter::parsePow(LayerParams& layerParams, const opencv_onnx::NodePro
 }
 
 // "Min" "Max"
-void ONNXImporter::parseMinMax(LayerParams& layerParams, const opencv_onnx::NodeProto& node_proto)
+void ONNXImporter::parseMinMax(LayerParams& layerParams, const opencv_onnx::NodeProto& node_proto_)
 {
+    opencv_onnx::NodeProto node_proto = node_proto_;
+    bool is_const_0 = layer_id.find(node_proto.input(0)) == layer_id.end();
+    bool is_const_1 = layer_id.find(node_proto.input(1)) == layer_id.end();
+
+    if(is_const_0 || is_const_1)
+    {
+        int const_blob_id = is_const_0 ? 0 : 1;
+        Mat blob = getBlob(node_proto, const_blob_id);
+
+        // set const Blob
+        LayerParams constParams;
+        constParams.name = layerParams.name + "/const";
+        constParams.type = "Const";
+        constParams.blobs.push_back(blob);
+        int id = dstNet.addLayer(constParams.name, constParams.type, constParams);
+        layer_id.insert(std::make_pair(constParams.name, LayerInfo(id, 0)));
+        node_proto.set_input(const_blob_id, constParams.name);
+
+        outShapes[constParams.name] = shape(blob);
+    }
+    int sizeInput = node_proto.input_size();
+    bool needBroadcast = false;
+    MatShape tempShape = outShapes[node_proto.input(0)];
+    for(int i = 1; i<sizeInput; i++)
+    {
+        if(tempShape != outShapes[node_proto.input(i)])
+        {
+            needBroadcast = true;
+            break;
+        }
+    }
+
+    if(needBroadcast)
+    {
+        std::vector<int> inputList;
+        for(int i = 0; i< node_proto.input_size(); i++)
+        {
+            inputList.push_back(i);
+        }
+
+        addBroadcasting(node_proto, inputList, layerParams);
+    }
     const std::string& layer_type = node_proto.op_type();
     layerParams.type = "Eltwise";
     layerParams.set("operation", layer_type == "Max" ? "max" : "min");
@@ -1680,19 +1763,43 @@ void ONNXImporter::parseAbs(LayerParams& layerParams, const opencv_onnx::NodePro
     addLayer(layerParams, node_proto);
 }
 
-void ONNXImporter::parseCompare(LayerParams& layerParams, const opencv_onnx::NodeProto& node_proto)
+void ONNXImporter::parseCompare(LayerParams& layerParams, const opencv_onnx::NodeProto& node_proto_)
 {
+    opencv_onnx::NodeProto node_proto = node_proto_;
     CV_Assert(node_proto.input_size() == 2);
     const std::string& layer_type = node_proto.op_type();
 
     bool is_const_0 = layer_id.find(node_proto.input(0)) == layer_id.end();
     bool is_const_1 = layer_id.find(node_proto.input(1)) == layer_id.end();
-
+    bool totalIs1 = false;
     if (is_const_0 || is_const_1)
     {
-        Mat blob = getBlob(node_proto, static_cast<int>(is_const_1));
-        blob = blob.reshape(1, 1);
-        layerParams.blobs.push_back(blob);
+        int const_blob_id = is_const_0 ? 0 : 1;
+
+        Mat blob = getBlob(node_proto, static_cast<int>(const_blob_id));
+        int blob_total = blob.total();
+        if(blob_total == 1)
+        {
+            totalIs1 = true;
+            blob = blob.reshape(1, 1);
+            layerParams.blobs.push_back(blob);
+        }else
+        {
+            LayerParams constParams;
+            constParams.name = layerParams.name + "/const";
+            constParams.type = "Const";
+            constParams.blobs.push_back(blob);
+            int id = dstNet.addLayer(constParams.name, constParams.type, constParams);
+            layer_id.insert(std::make_pair(constParams.name, LayerInfo(id, 0)));
+            outShapes[constParams.name] = shape(blob);
+            node_proto.set_input(const_blob_id, constParams.name);
+        }
+    }
+
+    if(outShapes[node_proto.input(0)] != outShapes[node_proto.input(1)] && !totalIs1)
+    {
+        std::vector<int> inputList = {0, 1};
+        addBroadcasting(node_proto, inputList, layerParams);
     }
 
     layerParams.type = "Compare";
@@ -1898,28 +2005,48 @@ void ONNXImporter::parseMul(LayerParams& layerParams, const opencv_onnx::NodePro
     }
     if (constId != -1 && haveVariables)
     {
+        int inputId = 1 - constId;
         Mat blob = getBlob(node_proto, constId);
-        blob = blob.reshape(1, 1);
-        if (blob.total() == 1) {
-            float blob_value = blob.ptr<float>()[0];
-            float coeff = blob_value;
-            if (isDiv)
-            {
-                coeff = 1.f / blob_value;
-                if (constId == 0)
+        MatShape blobshape = shape(blob);
+        if(blobshape == outShapes[node_proto.input(inputId)])
+        {
+            // set const Blob
+            LayerParams constParams;
+            constParams.name = layerParams.name + "/const";
+            constParams.type = "Const";
+            constParams.blobs.push_back(blob);
+            int id = dstNet.addLayer(constParams.name, constParams.type, constParams);
+            layer_id.insert(std::make_pair(constParams.name, LayerInfo(id, 0)));
+
+            node_proto.set_input(constId, constParams.name);
+            outShapes[constParams.name] = shape(blob);
+
+            layerParams.type = "Eltwise";
+            layerParams.set("operation", isDiv ? "div" : "prod");
+        }else
+        {
+            blob = blob.reshape(1, 1);
+            if (blob.total() == 1) {
+                float blob_value = blob.ptr<float>()[0];
+                float coeff = blob_value;
+                if (isDiv)
                 {
-                    // Power layer calculates (x*scale + shift)^power, so const/x -> (x * (1/const) + 0)^(-1)
-                    layerParams.set("power", -1.f);
+                    coeff = 1.f / blob_value;
+                    if (constId == 0)
+                    {
+                        // Power layer calculates (x*scale + shift)^power, so const/x -> (x * (1/const) + 0)^(-1)
+                        layerParams.set("power", -1.f);
+                    }
                 }
+                layerParams.set("scale", coeff);
+                layerParams.type = "Power";
             }
-            layerParams.set("scale", coeff);
-            layerParams.type = "Power";
-        }
-        else {
-            if (isDiv)
-                divide(1.0, blob, blob);
-            layerParams.blobs.push_back(blob);
-            layerParams.type = "Scale";
+            else {
+                if (isDiv)
+                    divide(1.0, blob, blob);
+                layerParams.blobs.push_back(blob);
+                layerParams.type = "Scale";
+            }
         }
     }
     else if (!haveVariables)
