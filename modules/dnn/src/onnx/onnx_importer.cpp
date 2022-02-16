@@ -2985,42 +2985,41 @@ void ONNXImporter::parseDepthToSpace(LayerParams& layerParams, const opencv_onnx
     layerParams.type = layer_type;
 
     // Get blocksize
-    int blocksize = 0;
-    if(layerParams.has("blocksize"))
-        blocksize = layerParams.get<int>("blocksize");
-    CV_CheckGT(blocksize, 0, "");
+    CV_Assert(layerParams.has("blocksize"));
+    int blocksize = layerParams.get<int>("blocksize");
 
     // Get mode, only for "DepthToSpace"
-    std::string modeType = "DCR";
-    if(layerParams.has("mode"))
-        modeType = layerParams.get<std::string>("mode");
+    std::string modeType = layerParams.get<std::string>("mode", "DCR");
 
     MatShape inpShape = outShapes[node_proto.input(0)];
+    int N = inpShape[0], C = inpShape[1], H = inpShape[2], W = inpShape[3];
     CV_Assert(inpShape.size() == 4);
 
     // Implement DepthToSpace and SpaceToDepth by the Reshape and Permute layer.
-    std::vector<int> shape0, shape1, perm;
+    std::array<int, 6> shape0, perm;
+    std::array<int, 4> shape1;
+
     if(layer_type == "DepthToSpace")
     {
         if(modeType == "DCR")
         {
-            shape0 = {inpShape[0], blocksize, blocksize, inpShape[1]/(blocksize * blocksize), inpShape[2], inpShape[3]};
+            shape0 = {N, blocksize, blocksize, C/(blocksize * blocksize), H, W};
             perm = {0, 3, 4, 1, 5, 2};
-            shape1 = {inpShape[0], inpShape[1]/(blocksize * blocksize), inpShape[2] * blocksize, inpShape[3] * blocksize};
+            shape1 = {N, C/(blocksize * blocksize), H * blocksize, W * blocksize};
         }
         else if (modeType == "CRD")
         {
-            shape0 = {inpShape[0], inpShape[1]/(blocksize * blocksize), blocksize, blocksize,  inpShape[2], inpShape[3]};
+            shape0 = {N, C/(blocksize * blocksize), blocksize, blocksize, H, W};
             perm = {0, 1, 4, 2, 5, 3};
-            shape1 = {inpShape[0], inpShape[1]/(blocksize * blocksize), inpShape[2] * blocksize, inpShape[3] * blocksize};
+            shape1 = {N, C/(blocksize * blocksize), H * blocksize, W * blocksize};
         }
         else
             CV_Error(Error::StsNotImplemented, "The mode of"+ modeType + " in DepthToSpace Layer is not supported");
     }else // SpaceToDepth
     {
-        shape0 = {inpShape[0], inpShape[1], inpShape[2]/blocksize, blocksize, inpShape[3]/blocksize, blocksize};
+        shape0 = {N, C, H/blocksize, blocksize, W/blocksize, blocksize};
         perm = {0, 3, 5, 1, 2, 4};
-        shape1 = {inpShape[0], inpShape[1]*blocksize * blocksize, inpShape[2]/blocksize, inpShape[3]/blocksize};
+        shape1 = {N, C*blocksize * blocksize, H/blocksize, W/blocksize};
     }
 
     // Step1: Reshape
@@ -3049,7 +3048,7 @@ void ONNXImporter::parseDepthToSpace(LayerParams& layerParams, const opencv_onnx
 
     // Step3: Reshape
     layerParams.type = "Reshape";
-    layerParams.set("dim", DictValue::arrayInt(&shape1[0], shape1.size()));
+    layerParams.set("dim", DictValue::arrayInt(shape1.data(), shape1.size()));
 
     node_proto.set_input(0, permuteLp.name);
     addLayer(layerParams, node_proto);
