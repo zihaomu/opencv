@@ -2992,8 +2992,8 @@ void ONNXImporter::parseDepthToSpace(LayerParams& layerParams, const opencv_onnx
     std::string modeType = layerParams.get<std::string>("mode", "DCR");
 
     MatShape inpShape = outShapes[node_proto.input(0)];
-    int N = inpShape[0], C = inpShape[1], H = inpShape[2], W = inpShape[3];
     CV_Assert(inpShape.size() == 4);
+    int N = inpShape[0], C = inpShape[1], H = inpShape[2], W = inpShape[3];
 
     // Implement DepthToSpace and SpaceToDepth by the Reshape and Permute layer.
     std::array<int, 6> shape0, perm;
