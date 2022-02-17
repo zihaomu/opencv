@@ -2982,11 +2982,11 @@ void ONNXImporter::parseDepthToSpace(LayerParams& layerParams, const opencv_onnx
     opencv_onnx::NodeProto node_proto = node_proto_;
     const std::string& layer_type = node_proto.op_type();
     CV_Assert(layer_type == "DepthToSpace" || layer_type == "SpaceToDepth");
-    layerParams.type = layer_type;
 
     // Get blocksize
     CV_Assert(layerParams.has("blocksize"));
     int blocksize = layerParams.get<int>("blocksize");
+    CV_Assert(blocksize > 0);
 
     // Get mode, only for "DepthToSpace"
     std::string modeType = layerParams.get<std::string>("mode", "DCR");
@@ -2999,9 +2999,9 @@ void ONNXImporter::parseDepthToSpace(LayerParams& layerParams, const opencv_onnx
     std::array<int, 6> shape0, perm;
     std::array<int, 4> shape1;
 
-    if(layer_type == "DepthToSpace")
+    if (layer_type == "DepthToSpace")
     {
-        if(modeType == "DCR")
+        if (modeType == "DCR")
         {
             shape0 = {N, blocksize, blocksize, C/(blocksize * blocksize), H, W};
             perm = {0, 3, 4, 1, 5, 2};
@@ -3014,12 +3014,13 @@ void ONNXImporter::parseDepthToSpace(LayerParams& layerParams, const opencv_onnx
             shape1 = {N, C/(blocksize * blocksize), H * blocksize, W * blocksize};
         }
         else
-            CV_Error(Error::StsNotImplemented, "The mode of"+ modeType + " in DepthToSpace Layer is not supported");
-    }else // SpaceToDepth
+            CV_Error(Error::StsNotImplemented, "The mode of " + modeType + " in " + layer_type + " Layer is not supported");
+    }
+    else // SpaceToDepth
     {
         shape0 = {N, C, H/blocksize, blocksize, W/blocksize, blocksize};
         perm = {0, 3, 5, 1, 2, 4};
-        shape1 = {N, C*blocksize * blocksize, H/blocksize, W/blocksize};
+        shape1 = {N, C * blocksize * blocksize, H/blocksize, W/blocksize};
     }
 
     // Step1: Reshape
