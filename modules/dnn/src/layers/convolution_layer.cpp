@@ -40,6 +40,11 @@
 //
 //M*/
 
+/*
+2022.03.16日，代码阅读目标：
+了解im2col和im2row在conv中的应用。
+*/
+
 #include "../precomp.hpp"
 #include "layers_common.hpp"
 #include "../op_cuda.hpp"
@@ -303,6 +308,7 @@ public:
     }
 #endif
 
+    // im2col中，input [1, C, H, W], 
     MatShape computeColRowShape(const MatShape &inpShape, const MatShape &outShape) const CV_OVERRIDE
     {
         CV_Assert(!blobs.empty());
@@ -418,18 +424,21 @@ public:
         inputs_arr.getMatVector(inputs);
         // prepare weightsMat where each row is aligned and has enough zero padding on the right to
         // use vectorized (i.e. with intrinsics) loops without tail processing
+
+        // 这里提前对齐weight。
+        // 对于weight或者kernel来说，维度为 [outC, inpC, H, W]，wm.step1() = inpC * H * W
         if (!blobs.empty())
         {
-            Mat wm = blobs[0].reshape(1, numOutput);
+            Mat wm = blobs[0].reshape(1, numOutput); // reshape完成之后 [outC, inpC * H * W]
             if( wm.step1() % VEC_ALIGN != 0 )
             {
                 int newcols = (int)alignSize(wm.step1(), VEC_ALIGN);
-                Mat wm_buffer = Mat(numOutput, newcols, wm.type());
-                Mat wm_padding = wm_buffer.colRange(wm.cols, newcols);
-                wm_padding.setTo(Scalar::all(0.));
-                Mat wm_aligned = wm_buffer.colRange(0, wm.cols);
-                wm.copyTo(wm_aligned);
-                wm = wm_aligned;
+                Mat wm_buffer = Mat(numOutput, newcols, wm.type());  // 这个是新的shape，填充最后部分。
+                Mat wm_padding = wm_buffer.colRange(wm.cols, newcols);  // 选出最后填充部分。
+                wm_padding.setTo(Scalar::all(0.));                       // 填充上0
+                Mat wm_aligned = wm_buffer.colRange(0, wm.cols);         // 对齐之后的矩阵。
+                wm.copyTo(wm_aligned);                                   // 将之前的内容，拷贝到wm_aligned 中。
+                wm = wm_aligned;                                         // 最后抛弃掉wm_aligned
             }
             weightsMat = wm;
         }
@@ -442,7 +451,7 @@ public:
         weightsMultipliers.assign(numOutput, 1.0);
 
         Mat biasMat = hasBias() ? blobs[1].reshape(1, numOutput) : Mat();
-        biasvec.resize(numOutput+2);
+        biasvec.resize(numOutput+2);  // 这里对齐为什么需要加2？
         if( biasMat.empty() )
         {
             for(int i = 0; i < numOutput; i++ )
@@ -1049,6 +1058,11 @@ public:
             , blk_size_cn(0)
         {}
 
+        /* 一些的参数的详解:
+        ngroups: 用于决定是depthWise还是普通的Group Convolution，还是普通的convolution
+        nstripes: 指的是将一个任务分成几块，也就是分成几大块进行并行。
+        */
+
         static void run( const Mat& input, Mat& output, const Mat& weights,
                          const std::vector<float>& biasvec,
                          const std::vector<float>& reluslope,
@@ -1109,8 +1123,10 @@ public:
             int kernel_h = isConv1D? 1 : kernel_size[kernel_size.size() - 2];
             int kernel_w = kernel_size.back();
 
+            // blk size 是以16的倍数递增。800为im2row最宽的数量。blk_size_cn0是算出当前最大的cn数，从而控制blk_size_cn。
             int blk_size_cn0 = cvCeil(800./(kernel_w*kernel_h));
-            int ncn = 16;
+            int ncn = 16;  // ncn是16位对齐操作，ncn*2 要小于blk_size_cn0，ncn要小于inpCn。用于处理输入通道过大时，需要分配较大的im2row的buffer
+            // 这种控制buffer大小的优化其实没有必要？在新的设计当中，buffer直接从A中分配出来。
             while (ncn*2 < blk_size_cn0 && ncn < inpCn)
                 ncn *= 2;
             ncn = std::min(ncn, inpCn);
@@ -1127,7 +1143,7 @@ public:
             {
                 for( int k = 0; k < ncn; k++ )
                     for( int k_c = 0; k_c < kernel_w; k_c++ )
-                        ofstab[k*kernel_w + k_c] = k*width + k_c*dil_w;
+                        ofstab[k*kernel_w + k_c] = k*width + k_c*dil_w;  // 这个是个快表，用于加速索引，但是对于不同datalayout情况下，索引将会不一样。
             }
             else if (isConv2D)
             {
@@ -1156,6 +1172,7 @@ public:
 
         virtual void operator ()(const Range &r0) const CV_OVERRIDE
         {
+            // 这里r0只代表线程数，是opencv一贯的并行写法。
             const int valign = ConvolutionLayerImpl::VEC_ALIGN;
             int ngroups = ngroups_, batchSize = input_->size[0]*ngroups;
             bool isConv1D = input_->dims == 3;
@@ -1164,12 +1181,13 @@ public:
 
             int outW = output_->size[output_->dims - 1];
             int outH = isConv1D? 1 : output_->size[output_->dims - 2];
-            int outCn = output_->size[1]/ngroups;
+            int outCn = output_->size[1]/ngroups; // 这个是一组滤波产生的output channel数。
+            /*例子：kernel为16x1x3x3，典型的depth wise的conv，则ngroups为16，输出channel为16，最后outCn为1.*/
 
-            int depth = isConv3D? input_->size[2] : 1;
+            int depth = isConv3D? input_->size[2] : 1; // 仅用于3D convolution，对于3D convolution，OpenCV中默认输入的shape为为5维：[N, C, D, H, W].
             int height = isConv1D? 1 : input_->size[input_->dims - 2];
             int width = input_->size[input_->dims - 1];
-            int inpCn = input_->size[1]/ngroups;
+            int inpCn = input_->size[1]/ngroups; // inpCn和outCn相同。
 
             const int nstripes = nstripes_;
 
@@ -1198,6 +1216,8 @@ public:
             int stripesPerSample;
             int stripeSize;
             Range r = r0;
+
+            // 下面这个判断基本上等于 ngroup == kenerl_size[0]
             bool depthWiseConvolution = !is1x1 && isConv2D && ngroups > 1 && inpCn == 1 &&
                 outCn == 1 && kernel_d == 1 && dilation_d == 1 && stride_d == 0 && pad_d == 0 &&
                 width >= 16 + dilation_w*(kernel_w - 1);
@@ -1235,6 +1255,7 @@ public:
             int blk_size = depthWiseConvolution ? outPlaneSize : min((int)BLK_SIZE, stripeSize);
 
             // im2row buffer is not used for depth-wise convolution
+            // 下面这操作还是没看懂，别人用的是im2col，这里用im2row是个什么意思？
             if(use_rowbuf)
             {
                 size_t rowbufsz = alignSize(karea*blk_size_cn, valign)*min((int)BLK_SIZE, blk_size);
@@ -1253,19 +1274,26 @@ public:
                 memset(rowbuf0, 0, rowbufsz*sizeof(rowbuf0[0]) );
             }
 
+
+            // step1 创建im2row的buffer。
+
+            // 将一个sample，划分为多个subsample。通过stripe/perSample来获取subsampleidx。来统一管理后续计算。
             for( int stripe = r.start; stripe < r.end; stripe++ )
             {
                 int subsampleIdx = stripe/stripesPerSample;
                 if( subsampleIdx >= batchSize )
                     break;
+
+                // 其中stripeSize是将原始数据按chennel维度进行划分的长度。stripeStart算出来就是对应起始位置的channel了。
                 int stripeStart = (int)((stripe - subsampleIdx*stripesPerSample)*stripeSize);
                 int stripeEnd = (int)std::min(stripeStart + stripeSize, outPlaneSize);
                 const float* data_inp0 = data_inp0_ + subsampleIdx*inpPlaneSize*inpCn;
                 float* data_out0 = data_out0_ + subsampleIdx*outPlaneSize*outCn;
-                int startOutCn = (subsampleIdx % ngroups)*outCn;
-                const float* wptr_orig = wptr_orig_ + wstep*startOutCn;
-                const float* biasptr = biasptr_ + startOutCn;
+                int startOutCn = (subsampleIdx % ngroups)*outCn;  // output 所有cn由bn*outCn共同组成。ngroups是
+                const float* wptr_orig = wptr_orig_ + wstep*startOutCn;  // wm的指针，跳转到正确的一行。
+                const float* biasptr = biasptr_ + startOutCn; // 设定biasPtr的指针。
 
+                // 这里又开始遍历所有inpCn？为何？将conv计算分成两部分，一个是inpCn，一个是outCn。outCn是由stripe控制的。
                 for( int cn0 = 0; cn0 < inpCn; cn0 += blk_size_cn )
                 {
                     int cn1 = std::min(cn0 + blk_size_cn, inpCn);
@@ -1614,7 +1642,7 @@ public:
                                 }
                             }
                         }
-                        else
+                        else  // for 3D or more dim
                         {
                             for( ofs = ofs0; ofs < ofs1; out_d += (out_i + 1) / outH, out_i = (out_i + 1) % outH, out_j = 0 )
                             {
@@ -1660,6 +1688,8 @@ public:
                                 }
                             }
                         }
+
+                        // 现在开始点乘运算。
 
                         // now compute dot product of the weights
                         // and im2row-transformed part of the tensor
@@ -2017,6 +2047,7 @@ public:
 
         int outCn = blobs.empty() ? inputs[1].size[0] : blobs[0].size[0];
         // Need to align non-const blobs
+        // 这里和finalize阶段处理的内容相同。
         if (blobs.empty())
         {
             Mat wm = inputs[1].reshape(1, outCn);
@@ -2053,6 +2084,7 @@ public:
         CV_Assert_N(inputs.size() >= (size_t)1, inputs[0].size[1] % inpGroupCn == 0,
                     outputs.size() == 1, inputs[0].data != outputs[0].data);
 
+        // ngroups是用于group Convolution, inpGroupCn = Kernel Channel. 
         int ngroups = inputs[0].size[1] / inpGroupCn;
         CV_Assert(outputs[0].size[1] % ngroups == 0);
 
@@ -2135,6 +2167,7 @@ public:
         {
             int nstripes = std::max(getNumThreads(), 1);
 
+            // 这里作为输入：input，output，weightsMat，biasvec都比较好理解。
             ParallelConv::run(inputs[0], outputs[0], weightsMat, biasvec, reluslope,
                             kernel_size, strides, pads_begin, pads_end, dilations, activ.get(), ngroups, nstripes);
         }
