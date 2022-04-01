@@ -1745,6 +1745,43 @@ public:
     CV_WRAP int getMaxCandidates() const;
 };
 
+// Mat dataType
+enum DataLayout
+{
+    DNN_DATALAYOUT_NCHW,
+    DNN_DATALAYOUT_NHWC,
+    DNN_DATALAYOUT_NC4HW4, // pack number is 4.
+    DNN_DATALAYOUT_NC8HW8, // pack number is 8.
+};
+
+/**
+ * @brief DNN module use NCHW as default. And this function can convert the input Mat to the desired data Layout.
+ * For example: from NCHW to NHWC, or NHWC to NC4HWC4. Given the @p src blob, @p inLayout and @p outLayout,
+ * convert out the @p dst Mat of the specified type.
+ * @param[in] src Binary file contains trained weights.
+ * @param[out] dst Text file contains network configuration.
+ * @param[in] inLayout Data layout of input Mat.
+ * @param[in] outLayout Required data layout of output Mat.
+ */
+CV_EXPORTS_W void dataLayoutConvert(InputArray src, OutputArray dst, DataLayout inLayout, DataLayout outLayout);
+
+
+// TODEL
+
+//#define CV_8U   0
+//#define CV_8S   1
+//#define CV_16U  2
+//#define CV_16S  3
+//#define CV_32S  4
+//#define CV_32F  5
+//#define CV_64F  6
+//#define CV_16F  7
+
+// TODEL
+void printblob(InputArray blob_);
+
+void shapePrint(InputArray blob_);
+
 //! @}
 CV__DNN_INLINE_NS_END
 }

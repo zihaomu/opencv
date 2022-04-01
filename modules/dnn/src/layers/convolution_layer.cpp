@@ -2066,6 +2066,120 @@ public:
         {
             int nstripes = std::max(getNumThreads(), 1);
 
+            bool isConv1D = inputs[0].dims == 3;
+            bool isConv2D = inputs[0].dims == 4;
+            bool isConv3D = inputs[0].dims == 5;
+
+            bool is1x1 = (isConv2D && kernel_size[kernel_size.size() - 2] == 1 && kernel_size.back() == 1 &&
+                         pads_begin[0] == 0  && pads_begin[1] == 0) ||
+                         (isConv1D && pads_begin[0] == 0 && kernel_size[0] == 1);
+
+            int kernel_h = isConv1D? 1 : kernel_size[kernel_size.size() - 2];
+            int kernel_w = kernel_size.back();
+            int karea = kernel_w*kernel_h;
+
+            int stride_h = isConv1D? 0 : strides[strides.size() - 2];
+            int stride_w = strides.back();
+
+            int dilation_h = isConv1D? 1 : dilations[dilations.size() - 2];
+            int dilation_w = dilations.back();
+
+            if (isConv2D)
+            {
+                bool depthWiseConvolution = !is1x1 && ngroups > 1 && ngroups == outputs[0].size[1] && inputs[0].size[1] == 1;
+                if (is1x1)
+                {
+
+                }
+                else if (depthWiseConvolution)
+                {
+                    if (kernel_h == 3 && kernel_w == 3 && stride_h == 1 && stride_w == 1 && dilation_h == 1 && dilation_w == 1)
+                    {
+                        std::cout<<"Run in kernel 3x3, stride 1,  DepthWise.";
+                    }
+                }
+                else
+                {
+                    // kerenl 3x3 and stride 1.
+                    if (kernel_h == 3 && kernel_w == 3 && stride_h == 1 && stride_w == 1 && dilation_h == 1 && dilation_w == 1)
+                    {
+                        std::cout<<"Run in kernel 3x3, stride 1,  ";
+                    }
+                }
+            }
+
+//
+//            // for now only 3x3 depth-wise convolutions are supported
+//            depthWiseConvolution = depthWiseConvolution && kernel_w == 3 && kernel_h == 3 &&
+//                                   // computing at most 1 pixel from each side can involve padding
+//                                   max(stride_w, dilation_w) >= pad_l && max(stride_h, dilation_h) >= pad_t &&
+//                                   pad_l <= 1 && pad_t <= 1;
+//
+//            CV_CheckEQ(static_cast<int>(kernel_size.size()), input.dims - 2, "");
+//            CV_Assert_N(input.dims == output.dims,
+//                        input.size[0] == output.size[0],
+//                        weights.rows == output.size[1],
+//                        weights.cols == (input.size[1]/ngroups)*karea,
+//                        input.type() == output.type(),
+//                        input.type() == weights.type(),
+//                        input.type() == CV_32FC1,
+//                        input.isContinuous(),
+//                        output.isContinuous(),
+//                        biasvec.size() == (size_t)output.size[1]+2);
+//            CV_Check(weights.step1(), weights.step1() % VEC_ALIGN == 0, "");
+//            CV_CheckType(weights.type(), CV_32FC1, "");
+//            ParallelConv p;
+//
+//            p.input_ = &input;
+//            p.weights_ = &weights;
+//            p.output_ = &output;
+//            int max_ind = isConv1D? 3: 4;
+//            for( int i = 0; i < max_ind; i++ ) p.outShape[i] = output.size[i];
+//            p.outShape[1] /= ngroups;
+//
+//            p.kernel_size = kernel_size; p.strides = strides; p.dilations = dilations;
+//            p.pads_begin = pads_begin; p.pads_end = pads_end;
+//
+//            p.ngroups_ = ngroups;
+//            p.nstripes_ = nstripes;
+//
+//            int inpCnAll = input.size[1];
+//            int depth = (input.dims == 5) ? input.size[2] : 1;
+//            int width = input.size[input.dims - 1];
+//            int height = isConv1D? 1 : input.size[input.dims - 2];
+//            int inpCn = inpCnAll / ngroups;
+
+//            if ( kernel_size.size())
+            // Adding more optimize Branches.
+
+            Mat bufferInputNC4HW4;
+
+            std::cout<< "before inputs[0] shape = ";
+            shapePrint(inputs[0]);
+
+
+
+            // Pack, from NCHW -> NC4HW4
+            dataLayoutConvert(inputs[0], bufferInputNC4HW4, DNN_DATALAYOUT_NCHW, DNN_DATALAYOUT_NHWC);
+
+            std::cout<< "buffer data = ";
+            printblob(bufferInputNC4HW4);
+//            std::cout<<std::endl;
+            std::cout<< "buffer shape = ";
+            shapePrint(bufferInputNC4HW4);
+//            std::cout<<std::endl;
+            // im2col pack layout
+
+
+            // winograd pack layout
+
+            // Upack, from NC4HW4 -> NCHW
+            printblob(inputs[0]);
+            dataLayoutConvert(bufferInputNC4HW4, inputs[0], DNN_DATALAYOUT_NHWC, DNN_DATALAYOUT_NCHW);
+            std::cout<< "after inputs[0] shape = ";
+            shapePrint(inputs[0]);
+            printblob(inputs[0]);
+            // default branch
             ParallelConv::run(inputs[0], outputs[0], weightsMat, biasvec, reluslope,
                             kernel_size, strides, pads_begin, pads_end, dilations, activ.get(), ngroups, nstripes);
         }

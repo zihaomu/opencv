@@ -154,5 +154,354 @@ void imagesFromBlob(const cv::Mat& blob_, OutputArrayOfArrays images_)
 }
 
 
+// dataconvert
+
+// TODEL
+void printblob(InputArray blob_) {
+    Mat blob = blob_.getMat();
+    auto shapeV = shape(blob);
+//    CV_Assert(shapeV[0] == 1);
+    auto typeMat = blob.type();
+
+    std::cout << "data type = " << typeMat << std::endl;
+    float *ptrf;
+    uchar *ptru;
+    char *ptrc;
+    int len = std::min(int(blob.total()), 100);
+    if (typeMat == 0) {
+        ptru = (uchar *) blob.data;
+        for (int i = 0; i < len; i++) {
+            std::cout << (int) *(ptru + i) << ", ";
+        }
+    }else if (typeMat == 1) {
+        ptrc = (char *)blob.data;
+        for(int i = 0; i<len; i++) {
+            std::cout<<(int) *(ptrc + i)<<", ";}
+
+    }else if (typeMat == 5) {
+        ptrf = (float *)blob.data;
+        for(int i = 0; i<len; i++) {
+            std::cout<<*(ptrf + i)<<", ";
+        }
+    }
+    std::cout<<std::endl;
+}
+
+void shapePrint(InputArray blob_)
+{
+    Mat blob = blob_.getMat();
+    auto shapeV = shape(blob);
+
+    std::cout<<"Mat shape = ";
+    for(auto & i : shapeV) {
+        std::cout<<i<<" x ";
+    }
+    std::cout<<std::endl;
+}
+W
+#define UP_DIV(x, y) (((x) + (y) - (1)) / (y))
+#define ROUND_UP(x, y) (((x) + (y) - (1)) / (y) * (y))   // 这个是将一个数对齐4位。
+#define ALIGN_UP4(x) ROUND_UP((x), 4)
+#define ALIGN_UP8(x) ROUND_UP((x), 8)
+void NHWC2NCHW(InputArray _src, OutputArray _dst)
+{
+    Mat src = _src.getMat();
+    MatShape srcShape = shape(src);
+    MatShape dstShape;
+    dstShape.assign(srcShape.begin(), srcShape.end());
+
+    // Move the channel to the second.
+    for (int i = dstShape.size() - 1; 1 < i; i--)
+    {
+        std::swap(dstShape[i - 1], dstShape[i]);
+    }
+
+    _dst.create(src.dims, &dstShape[0], src.type());
+    Mat dst = _dst.getMat();
+
+//    CV_Assert(srcShape.size() == 4);
+    int batchSize = srcShape[0];
+    int channel = srcShape[srcShape.size() - 1];
+    int depth = src.depth();
+    int area = 0;
+
+    if (srcShape.size() == 4)
+    {
+        area = srcShape[1] * srcShape[2];
+    }
+    else if (srcShape.size() == 5)
+    {
+        area = srcShape[1] * srcShape[2] * srcShape[3];
+    }
+    else if (srcShape.size() == 3)
+    {
+        area = srcShape[1];
+    }
+
+    // TODO! support int8_t
+    CV_Assert(depth == CV_32F);
+    float * inptr = src.ptr<float>();
+    float * outptr = dst.ptr<float>();
+    for (int bi = 0; bi < batchSize; bi++)
+    {
+        inptr = src.ptr<float>() + bi * channel * area;
+        outptr = dst.ptr<float>() + bi * channel * area;
+        for (int cur_area = 0; cur_area < area; cur_area++)
+        {
+            auto inptrD = inptr + channel * cur_area;
+            auto outptrD = outptr + cur_area;
+            for (int ci = 0; ci < channel; ci++)
+            {
+                outptrD[ci*area] = inptrD[ci];
+            }
+        }
+    }
+}
+
+void NCHW2NHWC(InputArray _src, OutputArray _dst) {
+    Mat src = _src.getMat();
+    MatShape srcShape = shape(src);
+    MatShape dstShape;
+    dstShape.assign(srcShape.begin(), srcShape.end());
+    // Move the channel to the last.
+    // Move the channel to the second.
+    for (int i = 1; i < dstShape.size() - 1; i++)
+    {
+        std::swap(dstShape[i], dstShape[i + 1]);
+    }
+    _dst.create(src.dims, &dstShape[0], src.type());
+    Mat dst = _dst.getMat();
+
+//    CV_Assert(srcShape.size() == 4);
+    int batchSize = srcShape[0];
+    int channel = srcShape[1];
+    int depth = src.depth();
+    int area = 0;
+
+    if (srcShape.size() == 4)
+    {
+        area = srcShape[2] * srcShape[3];
+    }
+    else if (srcShape.size() == 5)
+    {
+        area = srcShape[2] * srcShape[3] * srcShape[4];
+    }
+    else if (srcShape.size() == 3)
+    {
+        area = srcShape[2];
+    }
+
+    // TODO! support int8_t
+    CV_Assert(depth == CV_32F);
+    float * inptr = src.ptr<float>();
+    float * outptr = dst.ptr<float>();
+    for (int bi = 0; bi < batchSize; bi++)
+    {
+        inptr = src.ptr<float>() + bi * channel * area;
+        outptr = dst.ptr<float>() + bi * channel * area;
+        for (int cur_area = 0; cur_area < area; cur_area++)
+        {
+            auto inptrD = inptr + cur_area;
+            auto outptrD = outptr + channel * cur_area;
+            for (int ci = 0; ci < channel; ci++)
+            {
+                outptrD[ci] = inptrD[ci*area];
+            }
+        }
+    }
+
+
+//    int sourceBatchsize = c * area;
+//    int destBatchSize   = sourceBatchsize;
+//    for (int bi = 0; bi < b; ++bi) {
+//        auto srcBatch = source + bi * sourceBatchsize;
+//        auto dstBatch = dest + bi * destBatchSize;
+//        for (int i = 0; i < area; ++i) {
+//            auto srcArea = srcBatch + i * c;
+//            auto dstArea = dstBatch + i;
+//            for (int ci = 0; ci < c; ++ci) {
+//                dstArea[ci * area] = srcArea[ci];
+//            }
+//        }
+//    }
+}
+
+// Default is that dst need be put in to the right Output.
+void UnpackToNCHW(InputArray _src, OutputArray _dst, const int packElem = 4)
+{
+    Mat src = _src.getMat();
+    MatShape srcShape = shape(src);
+    CV_Assert(!_dst.empty());
+    Mat dst = _dst.getMat();
+    MatShape dstShape = shape(dst);
+
+//    dstShape.assign(srcShape.begin(), srcShape.end() - 1);
+//    dstShape[1] = srcShape[1] * src;
+//    _dst.create(dstShape.size(), &dstShape[0], src.depth());
+//    Mat dst = _dst.getMat();
+
+    int batchSize = dstShape[0];
+    int channel = dstShape[1];
+    int depth = dst.depth();
+    int area = 0;
+
+    if (dstShape.size() == 4)
+    {
+        area = dstShape[2] * dstShape[3];
+    }
+    else if (dstShape.size() == 5)
+    {
+        area = dstShape[2] * dstShape[3] * dstShape[4];
+    }
+    else if (dstShape.size() == 3)
+    {
+        area = dstShape[2];
+    }
+
+    // TODO! only for NCHW
+    int batchSrc = area * srcShape[1] * packElem;
+    int batchDst = area * dstShape[1];
+
+    // TODO! support int8_t
+    CV_Assert(depth == CV_32F);
+    float * inptr = src.ptr<float>();
+    float * outptr = dst.ptr<float>();
+    int ci, cur_area, idx;
+//    int remain = channel % packElem;
+
+    for (int bi = 0; bi < batchSize; bi++)
+    {
+        inptr = src.ptr<float>() + bi * batchSrc;
+        outptr = dst.ptr<float>() + bi * batchDst;
+        idx = 0;
+        for (ci = 0;  ci < channel; ci++)
+        {
+            int plane      = channel / packElem;
+            auto srcPlane = inptr + plane * area * packElem;
+            int offset     = ci % packElem;
+            for (cur_area = 0; cur_area < area; ++cur_area)
+            {
+                outptr[idx++] = srcPlane[packElem * cur_area + offset];
+            }
+        }
+    }
+}
+
+// If the channel % packElem != 0, we use zero padding. If the input shape is [N, C, H, W].
+// The output shape should be [N, RoundUp(C, 4), H, W, 4].
+void Pack4FromNCHW(InputArray _src, OutputArray _dst, const int packElem = 4)
+{
+    Mat src = _src.getMat();
+    MatShape srcShape = shape(src);
+    MatShape dstShape;
+    dstShape.assign(srcShape.begin(), srcShape.end());
+    dstShape.push_back(packElem);
+    dstShape[1] = UP_DIV(dstShape[1], packElem);
+    _dst.create(dstShape.size(), &dstShape[0], src.depth());
+    Mat dst = _dst.getMat();
+
+    int batchSize = srcShape[0];
+    int channel = srcShape[1];
+    int depth = src.depth();
+    int area = 0;
+
+    if (srcShape.size() == 4)
+    {
+        area = srcShape[2] * srcShape[3];
+    }
+    else if (srcShape.size() == 5)
+    {
+        area = srcShape[2] * srcShape[3] * srcShape[4];
+    }
+    else if (srcShape.size() == 3)
+    {
+        area = srcShape[2];
+    }
+
+    int batchSrc = area * srcShape[1];
+    int batchDst = area * dstShape[1] * packElem;
+    // TODO! support int8_t
+    CV_Assert(depth == CV_32F);
+    float * inptr = src.ptr<float>();
+    float * outptr = dst.ptr<float>();
+    int remain = channel % packElem;
+    int ci, cur_area, idx;
+    for (int bi = 0; bi < batchSize; bi++)
+    {
+        inptr = src.ptr<float>() + bi * batchSrc;
+        outptr = dst.ptr<float>() + bi * batchDst;
+        idx = 0;
+        for (ci = 0;  ci < channel; ci++)
+        {
+            int plane = ci / packElem;
+            int offset = ci % packElem;
+            auto dstPlane = outptr + plane * area * packElem;
+
+            for (cur_area = 0; cur_area < area; ++cur_area)
+            {
+                dstPlane[packElem * cur_area + offset] = inptr[idx++];
+            }
+        }
+
+        // zero padding for remain channel.
+        if (remain > 0)
+        {
+            for (ci = channel; ci < ROUND_UP(channel, packElem); ci ++)
+            {
+                int plane = ci / packElem;
+                int offset= ci % packElem;
+                auto dstPlane = outptr + plane * area * packElem;
+
+                for (cur_area = 0; cur_area < area; ++cur_area)
+                {
+                    dstPlane[packElem * cur_area + offset] = 0;
+                }
+            }
+        }
+    }
+}
+
+// For Mat
+void dataLayoutConvert(InputArray _src, OutputArray _dst, DataLayout inpLayout, DataLayout outLayout)
+{
+    // TODO: support data type: float 16, int 8.
+    // get input data depth.
+    Mat src = _src.getMat();
+
+    if (inpLayout == DNN_DATALAYOUT_NCHW && outLayout == DNN_DATALAYOUT_NHWC)
+    {
+        NCHW2NHWC(_src, _dst);
+    }
+    else if (inpLayout == DNN_DATALAYOUT_NHWC && outLayout == DNN_DATALAYOUT_NCHW)
+    {
+        NHWC2NCHW(_src, _dst);
+    }
+
+    // Unpack the Blob
+    if (inpLayout == DNN_DATALAYOUT_NC4HW4)
+    {
+        if (outLayout == DNN_DATALAYOUT_NCHW)
+        {
+            UnpackToNCHW(_src, _dst, 4);
+        }
+        else // TODO! outLayout = DNN_DATALAYOUT_NHWC
+            CV_Error(Error::StsNotImplemented, "Not Implemet DataLayOut");
+    }
+
+    // Pack the Blob
+    if (outLayout == DNN_DATALAYOUT_NC4HW4)
+    {
+        if (inpLayout == DNN_DATALAYOUT_NCHW)
+        {
+            Pack4FromNCHW(_src, _dst, 4);
+        }
+        else // inpLayout = DNN_DATALAYOUT_NHWC
+            CV_Error(Error::StsNotImplemented, "Not Implemet DataLayOut");
+    }
+}
+
+
+
+
 CV__DNN_INLINE_NS_END
 }}  // namespace cv::dnn
