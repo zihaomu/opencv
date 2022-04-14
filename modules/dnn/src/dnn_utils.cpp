@@ -198,7 +198,7 @@ void shapePrint(InputArray blob_)
     }
     std::cout<<std::endl;
 }
-W
+
 #define UP_DIV(x, y) (((x) + (y) - (1)) / (y))
 #define ROUND_UP(x, y) (((x) + (y) - (1)) / (y) * (y))   // 这个是将一个数对齐4位。
 #define ALIGN_UP4(x) ROUND_UP((x), 4)
@@ -246,6 +246,10 @@ void NHWC2NCHW(InputArray _src, OutputArray _dst)
     {
         inptr = src.ptr<float>() + bi * channel * area;
         outptr = dst.ptr<float>() + bi * channel * area;
+
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
         for (int cur_area = 0; cur_area < area; cur_area++)
         {
             auto inptrD = inptr + channel * cur_area;
@@ -299,6 +303,10 @@ void NCHW2NHWC(InputArray _src, OutputArray _dst) {
     {
         inptr = src.ptr<float>() + bi * channel * area;
         outptr = dst.ptr<float>() + bi * channel * area;
+
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
         for (int cur_area = 0; cur_area < area; cur_area++)
         {
             auto inptrD = inptr + cur_area;
@@ -373,9 +381,14 @@ void UnpackToNCHW(InputArray _src, OutputArray _dst, const int packElem = 4)
     {
         inptr = src.ptr<float>() + bi * batchSrc;
         outptr = dst.ptr<float>() + bi * batchDst;
-        idx = 0;
+//        idx = 0;
+
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
         for (ci = 0;  ci < channel; ci++)
         {
+            int idx = ci * area;
             int plane      = channel / packElem;
             auto srcPlane = inptr + plane * area * packElem;
             int offset     = ci % packElem;
@@ -430,9 +443,14 @@ void Pack4FromNCHW(InputArray _src, OutputArray _dst, const int packElem = 4)
     {
         inptr = src.ptr<float>() + bi * batchSrc;
         outptr = dst.ptr<float>() + bi * batchDst;
-        idx = 0;
+//        idx = 0;
+
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
         for (ci = 0;  ci < channel; ci++)
         {
+            int idx = ci * area;
             int plane = ci / packElem;
             int offset = ci % packElem;
             auto dstPlane = outptr + plane * area * packElem;

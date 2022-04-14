@@ -222,6 +222,13 @@ CV__DNN_INLINE_NS_BEGIN
          */
         CV_WRAP virtual void finalize(InputArrayOfArrays inputs, OutputArrayOfArrays outputs);
 
+        /** @brief After layer fusion, we need carry on some nassary process for layer.
+         *
+         * This method is called after network has allocated all memory for input and output blobs
+         * and fused all layer, but before inferencing.
+         */
+        CV_WRAP virtual void afterFuse();
+
         /** @brief Given the @p input blobs, computes the output @p blobs.
          *  @deprecated Use Layer::forward(InputArrayOfArrays, OutputArrayOfArrays, OutputArrayOfArrays) instead
          *  @param[in]  input  the input blobs.
@@ -417,6 +424,18 @@ CV__DNN_INLINE_NS_BEGIN
                                const std::vector<MatShape> &outputs) const {CV_UNUSED(inputs); CV_UNUSED(outputs); return 0;}
 
         virtual bool updateMemoryShapes(const std::vector<MatShape> &inputs);
+
+        static TickMeter layerTickmeter; // for convolution padding time analysis.
+
+        static void resetTickmeter()
+        {
+            return layerTickmeter.reset();
+        }
+
+        static double getTickmeter()
+        {
+            return layerTickmeter.getTimeMilli();
+        }
 
         CV_PROP String name; //!< Name of the layer instance, can be used for logging or other internal purposes.
         CV_PROP String type; //!< Type name which was used for creating layer by layer factory.

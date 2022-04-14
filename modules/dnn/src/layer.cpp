@@ -3,13 +3,17 @@
 // of this distribution and at http://opencv.org/license.html.
 
 #include "precomp.hpp"
+#include "opencv2/dnn/dnn.hpp"
+
 
 namespace cv {
 namespace dnn {
 CV__DNN_INLINE_NS_BEGIN
 
 
-Layer::Layer() { preferableTarget = DNN_TARGET_CPU; }
+TickMeter Layer::layerTickmeter = TickMeter();
+
+Layer::Layer() { preferableTarget = DNN_TARGET_CPU;}
 
 Layer::Layer(const LayerParams& params)
     : blobs(params.blobs)
@@ -138,6 +142,12 @@ void Layer::finalize(InputArrayOfArrays inputs_arr, OutputArrayOfArrays outputs_
     std::vector<Mat*> inputsp;
     vecToPVec(inputs, inputsp);
     this->finalize(inputsp, outputs);
+}
+
+// Add perforward.
+void Layer::afterFuse()
+{
+    CV_TRACE_FUNCTION();
 }
 
 std::vector<Mat> Layer::finalize(const std::vector<Mat>& inputs)

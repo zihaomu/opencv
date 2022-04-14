@@ -763,7 +763,9 @@ Mat::Mat(const Mat& m, const Range& _rowRange, const Range& _colRange)
     {
         if( _rowRange != Range::all() && _rowRange != Range(0,rows) )
         {
-            CV_Assert( 0 <= _rowRange.start && _rowRange.start <= _rowRange.end
+            if (!( 0 <= _rowRange.start && _rowRange.start <= _rowRange.end
+                       && _rowRange.end <= m.rows ))
+                CV_Assert( 0 <= _rowRange.start && _rowRange.start <= _rowRange.end
                        && _rowRange.end <= m.rows );
             rows = _rowRange.size();
             data += step*_rowRange.start;

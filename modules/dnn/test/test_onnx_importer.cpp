@@ -16,6 +16,35 @@ static std::string _tf(TString filename, bool required = true)
 {
     return findDataFile(std::string("dnn/onnx/") + filename, required);
 }
+void printblob(InputArray blob_) {
+    Mat blob = blob_.getMat();
+    auto shapeV = shape(blob);
+//    CV_Assert(shapeV[0] == 1);
+    auto typeMat = blob.type();
+
+    std::cout << "data type = " << typeMat << std::endl;
+    float *ptrf;
+    uchar *ptru;
+    char *ptrc;
+    int len = std::min(int(blob.total()), 100);
+    if (typeMat == 0) {
+        ptru = (uchar *) blob.data;
+        for (int i = 0; i < len; i++) {
+            std::cout << (int) *(ptru + i) << ", ";
+        }
+    }else if (typeMat == 1) {
+        ptrc = (char *)blob.data;
+        for(int i = 0; i<len; i++) {
+            std::cout<<(int) *(ptrc + i)<<", ";}
+
+    }else if (typeMat == 5) {
+        ptrf = (float *)blob.data;
+        for(int i = 0; i<len; i++) {
+            std::cout<<*(ptrf + i)<<", ";
+        }
+    }
+    std::cout<<std::endl;
+}
 
 class Test_ONNX_layers : public DNNTestLayer
 {
@@ -79,6 +108,11 @@ public:
             netSoftmax.setInput(ref);
             ref = netSoftmax.forward();
         }
+        std::cout<<"blob out = ";
+        printblob(out);
+        std::cout<<std::endl;
+        std::cout<<"blob ref = ";
+        printblob(ref);
         normAssert(ref, out, "", l1 ? l1 : default_l1, lInf ? lInf : default_lInf);
         if (checkNoFallbacks)
             expectNoFallbacksFromIE(net);
@@ -111,7 +145,7 @@ TEST_P(Test_ONNX_layers, MaxPooling_2)
 
 TEST_P(Test_ONNX_layers, Convolution)
 {
-    testONNXModels("convolution");
+    testONNXModels("convolution", npy, 0.01, 0.01);
     testONNXModels("conv_asymmetric_pads");
 }
 
@@ -142,6 +176,12 @@ TEST_P(Test_ONNX_layers, Convolution_variable_weight)
         net.setInput(weights, "1");
 
         Mat out = net.forward();
+
+        std::cout<<"variab blob out = ";
+        printblob(out);
+        std::cout<<std::endl;
+        std::cout<<"variab blob ref = ";
+        printblob(ref);
         normAssert(ref, out, "", default_l1, default_lInf);
     }
 }
@@ -180,6 +220,12 @@ TEST_P(Test_ONNX_layers, Convolution_variable_weight_bias)
         net.setInput(bias, "bias");
 
         Mat out = net.forward();
+
+        std::cout<<"bias blob out = ";
+        printblob(out);
+        std::cout<<std::endl;
+        std::cout<<"bias blob ref = ";
+        printblob(ref);
         normAssert(ref, out, "", default_l1, default_lInf);
     }
 }
@@ -1646,6 +1692,50 @@ public:
     Test_ONNX_nets() { required = false; }
 };
 
+
+TEST_P(Test_ONNX_nets, MooSpeed_Test)
+{
+    // load input
+    Mat image = imread("/home/moo/model_test/img/junco.jpeg");
+    Scalar meanValue(0.485, 0.456, 0.406);
+    Scalar stdValue(0.229, 0.224, 0.225);
+
+    Mat blob = blobFromImage(image, 1.0/255.0,Size(224, 224), meanValue, false);
+    blob /= stdValue;
+    Net net = readNetFromONNX("/home/moo/model_test/models/resnet50-v1-12.onnx");
+
+    // set Default backend
+    net.setPreferableBackend(DNN_BACKEND_DEFAULT);
+    net.setPreferableTarget(DNN_BACKEND_DEFAULT);
+    std::vector<Mat> out;
+//    net.setInput(blob);
+//    net.forward(out); // warm up
+    cv::TickMeter tickmeter;
+    std::vector<double> times;
+    std::vector<double> times_padding;
+    for(int i = 0; i < 100; i++)
+    {
+        tickmeter.reset();
+        tickmeter.start();
+        Layer::resetTickmeter();
+
+        net.setInput(blob);
+        net.forward(out);
+        tickmeter.stop();
+        times.push_back(tickmeter.getTimeMilli());
+        times_padding.push_back(Layer::getTickmeter());
+    }
+    sort(times.begin(),times.end());
+    sort(times_padding.begin(),times_padding.end());
+    cout<<"time cost = "<<times[0] <<endl; // print the shortest time.
+    cout<<"time cost of padding = "<<times_padding[0] <<endl; // print the shortest time.
+
+    double min=0, max=0;
+    Point minLoc, maxLoc;
+    minMaxLoc(out[0], &min, &max, &minLoc, &maxLoc);
+    cout<<"class num = "<<maxLoc.x<<std::endl;
+}
+
 TEST_P(Test_ONNX_nets, Alexnet)
 {
 #if defined(OPENCV_32BIT_CONFIGURATION) && (defined(HAVE_OPENCL) || defined(_WIN32))
@@ -1951,6 +2041,43 @@ TEST_P(Test_ONNX_nets, DenseNet121)
     // output range: [-87; 138], after Softmax [0; 1]
     testONNXModels("densenet121", pb, default_l1, default_lInf, true, target != DNN_TARGET_MYRIAD);
 }
+
+
+//TEST_P(Test_ONNX_nets, Moo)
+//{
+//    // load input
+//    Mat image = imread("/home/moo/goldfish.jpeg");
+//    Scalar meanValue(0.485, 0.456, 0.406);
+//    Scalar stdValue(0.229, 0.224, 0.225);
+//
+//    Mat blob = blobFromImage(image, 1.0/255.0,Size(224, 224), meanValue, true);
+//    blob /= stdValue;
+//    Net net = readNetFromONNX("/home/moo/resnet50-v1-12-int8.onnx");
+//
+//    // set TimVX backend
+//    net.setPreferableBackend(DNN_BACKEND_TIMVX);
+//    net.setPreferableTarget(DNN_TARGET_NPU);
+//    std::vector<Mat> out;
+//    net.setInput(blob);
+//    net.forward(out); // warm up
+//
+//    cv::TickMeter tickmeter;
+//    std::vector<double> times;
+////    for(int i = 0; i < 100; i++)
+////    {
+////        tickmeter.reset();
+////        tickmeter.start();
+////        net.forward(out);
+////        tickmeter.stop();
+////        times.push_back(tickmeter.getTimeMilli());
+////    }
+////    sort(times.begin(),times.end());
+////    cout<<"time cost = "<<times[0] <<endl; // print the shortest time.
+//    double min=0, max=0;
+//    Point minLoc, maxLoc;
+//    minMaxLoc(out[0], &min, &max, &minLoc, &maxLoc);
+//    cout<<"class num = "<<maxLoc.x<<std::endl;
+//}
 
 TEST_P(Test_ONNX_nets, Inception_v1)
 {

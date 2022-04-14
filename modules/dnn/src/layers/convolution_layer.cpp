@@ -48,6 +48,7 @@
 #include "../ie_ngraph.hpp"
 #include "../op_vkcom.hpp"
 #include "../op_webnn.hpp"
+#include "./convolution_arm/convolution_arm.hpp"
 
 #include <opencv2/core/utils/configuration.private.hpp>
 #include <opencv2/core/utils/logger.hpp>
@@ -253,7 +254,7 @@ class ConvolutionLayerImpl CV_FINAL : public BaseConvolutionLayerImpl
 {
 public:
     enum { VEC_ALIGN = 8, DFT_TYPE = CV_32F };
-    Mat weightsMat;
+    Mat weightsMat, weightsMatAlign;
     std::vector<float> biasvec;
     std::vector<float> reluslope;
     Ptr<ActivationLayer> activ;
@@ -416,24 +417,10 @@ public:
 
         std::vector<Mat> inputs;
         inputs_arr.getMatVector(inputs);
-        // prepare weightsMat where each row is aligned and has enough zero padding on the right to
-        // use vectorized (i.e. with intrinsics) loops without tail processing
+
         if (!blobs.empty())
         {
-            Mat wm = blobs[0].reshape(1, numOutput);
-            if ((wm.step1() % VEC_ALIGN != 0) ||
-                !isAligned<VEC_ALIGN * sizeof(float)>(wm.data)
-            )
-            {
-                int newcols = (int)alignSize(wm.step1(), VEC_ALIGN);
-                Mat wm_buffer = Mat(numOutput, newcols, wm.type());
-                Mat wm_padding = wm_buffer.colRange(wm.cols, newcols);
-                wm_padding.setTo(Scalar::all(0.));
-                Mat wm_aligned = wm_buffer.colRange(0, wm.cols);
-                wm.copyTo(wm_aligned);
-                wm = wm_aligned;
-            }
-            weightsMat = wm;
+            weightsMat = blobs[0];
         }
         else
         {
@@ -465,6 +452,35 @@ public:
 #ifdef HAVE_OPENCL
         convolutionOp.release();
 #endif
+    }
+
+    void afterFuse() CV_OVERRIDE
+    {
+        // we do weight alignment and block layout here.
+        // prepare weightsMat where each row is aligned and has enough zero padding on the right to
+        // use vectorized (i.e. with intrinsics) loops without tail processing
+        if (!blobs.empty() && !weightsMat.empty())
+        {
+            Mat wm = weightsMat.reshape(1, numOutput);
+            if ((wm.step1() % VEC_ALIGN != 0) ||
+                !isAligned<VEC_ALIGN * sizeof(float)>(wm.data)
+                    )
+            {
+                int newcols = (int)alignSize(wm.step1(), VEC_ALIGN);
+                Mat wm_buffer = Mat(numOutput, newcols, wm.type());
+                Mat wm_padding = wm_buffer.colRange(wm.cols, newcols);
+                wm_padding.setTo(Scalar::all(0.));
+                Mat wm_aligned = wm_buffer.colRange(0, wm.cols);
+                wm.copyTo(wm_aligned);
+                wm = wm_aligned;
+            }
+            weightsMatAlign = wm;
+        }
+        else
+        {
+            // initialized in .forward()
+            weightsMat.release();
+        }
     }
 
     bool setActivation(const Ptr<ActivationLayer>& layer) CV_OVERRIDE
@@ -626,9 +642,13 @@ public:
         {
             // Keep origin weights unchanged.
             if (weightsMat.data == blobs[0].data)
-                weightsMat = weightsMat.clone();
+            {
+                weightsMat = blobs[0].clone();
+                weightsMat = weightsMat.reshape(1, outCn);
+            }
 
             Mat originWeights = blobs[0].reshape(1, outCn);
+
             for (int i = 0; i < outCn; ++i)
             {
                 double wi = w.at<float>(i);
@@ -980,6 +1000,8 @@ public:
         bool useAVX2;
         bool useAVX512;
         bool useRVV;
+        bool useNEON;
+
         int blk_size_cn;
 
         ParallelConv()
@@ -1039,10 +1061,16 @@ public:
                        pads_begin[0] == 0  && pads_begin[1] == 0) ||
                        (isConv1D && pads_begin[0] == 0 && kernel_size[0] == 1);
 
-            p.useAVX    = checkHardwareSupport(CPU_AVX)  && isConv2D;
-            p.useAVX2   = checkHardwareSupport(CPU_AVX2) && isConv2D;
-            p.useAVX512 = CV_CPU_HAS_SUPPORT_AVX512_SKX  && isConv2D;
-            p.useRVV   = checkHardwareSupport(CPU_RVV) && isConv2D;
+//            p.useAVX    = checkHardwareSupport(CPU_AVX)  && isConv2D;
+//            p.useAVX2   = checkHardwareSupport(CPU_AVX2) && isConv2D;
+//            p.useAVX512 = CV_CPU_HAS_SUPPORT_AVX512_SKX  && isConv2D;
+//            p.useRVV   = checkHardwareSupport(CPU_RVV) && isConv2D;
+
+            p.useAVX    = false;
+            p.useAVX2   = true;
+            p.useAVX512 = false;
+            p.useRVV    =  false;
+
 
             int kernel_d = isConv3D? kernel_size[0] : 1;
             int kernel_h = isConv1D? 1 : kernel_size[kernel_size.size() - 2];
@@ -1247,6 +1275,13 @@ public:
                         #if CV_TRY_RVV
                             if(useRVV)
                                 opt_RVV::fastDepthwiseConv(wptr, kernel_h, kernel_w,
+                                    stride_h, stride_w, dilation_h, dilation_w, pad_t, pad_l,
+                                    biasptr, relu, inptr_, height, width, outptr_, out_d, outH, outW);
+                            else
+                        #endif
+                        #if CV_TRY_NEON
+                            if(useNEON)
+                                opt_NEON::fastDepthwiseConv(wptr, kernel_h, kernel_w,
                                     stride_h, stride_w, dilation_h, dilation_w, pad_t, pad_l,
                                     biasptr, relu, inptr_, height, width, outptr_, out_d, outH, outW);
                             else
@@ -1950,16 +1985,17 @@ public:
         // Need to align non-const blobs
         if (blobs.empty())
         {
+            weightsMat = inputs[1];
             Mat wm = inputs[1].reshape(1, outCn);
-            if (wm.data != weightsMat.data)
+            if (wm.data != weightsMatAlign.data)
             {
                 int newcols = (int)alignSize(wm.step1(), VEC_ALIGN);
                 Mat wm_buffer = Mat(numOutput, newcols, wm.type());
                 Mat wm_padding = wm_buffer.colRange(wm.cols, newcols);
                 wm_padding.setTo(Scalar::all(0.));
-                weightsMat = wm_buffer.colRange(0, wm.cols);
+                weightsMatAlign = wm_buffer.colRange(0, wm.cols);
 
-                wm.copyTo((const Mat&)weightsMat);
+                wm.copyTo((const Mat&)weightsMatAlign);
                 if (inputs.size() > 2)
                 {
                     Mat biasMat = inputs[2].reshape(1, outCn);
@@ -2065,6 +2101,7 @@ public:
 #endif
         {
             int nstripes = std::max(getNumThreads(), 1);
+//            int nstripes = 1;
 
             bool isConv1D = inputs[0].dims == 3;
             bool isConv2D = inputs[0].dims == 4;
@@ -2084,9 +2121,95 @@ public:
             int dilation_h = isConv1D? 1 : dilations[dilations.size() - 2];
             int dilation_w = dilations.back();
 
-            if (isConv2D)
+            bool depthWiseConvolution = !is1x1 && ngroups > 1 && ngroups == outputs[0].size[1] && inputs[0].size[1] == ngroups;
+
+            Mat oringinalWeightBlob = blobs.empty() ? inputs[1] : blobs[0];
+
+            if (weightsMatAlign.empty())
             {
-                bool depthWiseConvolution = !is1x1 && ngroups > 1 && ngroups == outputs[0].size[1] && inputs[0].size[1] == 1;
+                weightsMatAlign = weightsMat;
+            }
+
+            MatShape inputShape = shape(inputs[0]);
+            MatShape outputShape = shape(outputs[0]);
+//            std::cout<<"output shape "<<std::endl;
+//            shapePrint(outputs[0]);
+//
+//            std::cout<<"oringinalWeightBlob"<<std::endl;
+//            shapePrint(oringinalWeightBlob);
+//            printblob(oringinalWeightBlob);
+//
+//            std::cout<<"weightsMat"<<std::endl;
+//            shapePrint(weightsMat);
+//            printblob(weightsMat);
+//
+//            std::cout<<"weightsMatAlign"<<std::endl;
+//            shapePrint(weightsMatAlign);
+//            printblob(weightsMatAlign);
+
+//            if (isConv2D && !depthWiseConvolution)
+            if (0)
+            {
+                // Run padding
+                MatShape inputShape = shape(inputs[0]);
+                MatShape padInputShape;
+                padInputShape.assign(inputShape.begin(), inputShape.end());
+
+                // NCHW
+                padInputShape[2] += pads_begin[0] + pads_end[0]; // H
+                padInputShape[3] += pads_begin[1] + pads_end[1]; // W
+                Mat padInput;
+                if (pads_begin[0] != 0 || pads_begin[1] != 0 || pads_end[0]!= 0 || pads_end[1] != 0)
+                {
+                    layerTickmeter.start();
+                    padInput = Mat::zeros(padInputShape.size(), &padInputShape[0], inputs[0].depth());
+                    // Compute dstRanges.
+                    std::vector<Range> dstRanges;
+                    dstRanges.resize(4, Range::all());
+                    dstRanges[2].start = pads_begin[0];
+                    dstRanges[2].end = padInputShape[2] - pads_end[0];
+                    dstRanges[3].start = pads_begin[1];
+                    dstRanges[3].end = padInputShape[3] - pads_end[1];
+                    inputs[0].copyTo(padInput(dstRanges));
+
+                    layerTickmeter.stop();
+                }
+                else
+                    padInput = inputs[0];
+
+                Mat colWeightMat;
+
+                // normal branch for convolution, resenet 90 ms, default is 27 ms.
+                im2col_sgemm_transform_kernel(weightsMat, colWeightMat);
+                convolution_im2col_sgemm(padInput, outputs[0], colWeightMat, biasvec, reluslope, kernel_w, kernel_h, stride_w, stride_h, dilation_w, dilation_h);
+
+
+                // 4 pack branch. the output colWeightMat was pack4
+//                im2col_sgemm_transform_kernel_pack4(weightsMat, colWeightMat);
+//
+//                // allocate packOutput
+//                MatShape outputShapePack;
+//                outputShapePack.assign(outputShape.begin(), outputShape.end());
+//
+//                Mat outputPack4, inputPack4;
+//                dataLayoutConvert(outputs[0], outputPack4, DNN_DATALAYOUT_NCHW, DNN_DATALAYOUT_NC4HW4);
+//                dataLayoutConvert(padInput, inputPack4, DNN_DATALAYOUT_NCHW, DNN_DATALAYOUT_NC4HW4);
+//
+//                convolution_im2col_sgemm_pack4(inputPack4, outputPack4, colWeightMat, biasvec, reluslope, kernel_w, kernel_h, stride_w, stride_h, dilation_w, dilation_h);
+//
+//                dataLayoutConvert(outputPack4, outputs[0], DNN_DATALAYOUT_NC4HW4, DNN_DATALAYOUT_NCHW);
+
+
+
+//                MatShape oWShape = shape(oringinalWeightBlob);
+//                MatShape afterShape = shape(weightsMat);
+//                MatShape colWeightShape = shape(colWeightMat);
+
+
+
+                return;
+
+
                 if (is1x1)
                 {
 
@@ -2103,84 +2226,13 @@ public:
                     // kerenl 3x3 and stride 1.
                     if (kernel_h == 3 && kernel_w == 3 && stride_h == 1 && stride_w == 1 && dilation_h == 1 && dilation_w == 1)
                     {
-                        std::cout<<"Run in kernel 3x3, stride 1,  ";
+                        std::cout<<"Run in kernel 3x3, stride 1,  Should add some winograd branch for that.";
                     }
                 }
             }
 
-//
-//            // for now only 3x3 depth-wise convolutions are supported
-//            depthWiseConvolution = depthWiseConvolution && kernel_w == 3 && kernel_h == 3 &&
-//                                   // computing at most 1 pixel from each side can involve padding
-//                                   max(stride_w, dilation_w) >= pad_l && max(stride_h, dilation_h) >= pad_t &&
-//                                   pad_l <= 1 && pad_t <= 1;
-//
-//            CV_CheckEQ(static_cast<int>(kernel_size.size()), input.dims - 2, "");
-//            CV_Assert_N(input.dims == output.dims,
-//                        input.size[0] == output.size[0],
-//                        weights.rows == output.size[1],
-//                        weights.cols == (input.size[1]/ngroups)*karea,
-//                        input.type() == output.type(),
-//                        input.type() == weights.type(),
-//                        input.type() == CV_32FC1,
-//                        input.isContinuous(),
-//                        output.isContinuous(),
-//                        biasvec.size() == (size_t)output.size[1]+2);
-//            CV_Check(weights.step1(), weights.step1() % VEC_ALIGN == 0, "");
-//            CV_CheckType(weights.type(), CV_32FC1, "");
-//            ParallelConv p;
-//
-//            p.input_ = &input;
-//            p.weights_ = &weights;
-//            p.output_ = &output;
-//            int max_ind = isConv1D? 3: 4;
-//            for( int i = 0; i < max_ind; i++ ) p.outShape[i] = output.size[i];
-//            p.outShape[1] /= ngroups;
-//
-//            p.kernel_size = kernel_size; p.strides = strides; p.dilations = dilations;
-//            p.pads_begin = pads_begin; p.pads_end = pads_end;
-//
-//            p.ngroups_ = ngroups;
-//            p.nstripes_ = nstripes;
-//
-//            int inpCnAll = input.size[1];
-//            int depth = (input.dims == 5) ? input.size[2] : 1;
-//            int width = input.size[input.dims - 1];
-//            int height = isConv1D? 1 : input.size[input.dims - 2];
-//            int inpCn = inpCnAll / ngroups;
-
-//            if ( kernel_size.size())
-            // Adding more optimize Branches.
-
-            Mat bufferInputNC4HW4;
-
-            std::cout<< "before inputs[0] shape = ";
-            shapePrint(inputs[0]);
-
-
-
-            // Pack, from NCHW -> NC4HW4
-            dataLayoutConvert(inputs[0], bufferInputNC4HW4, DNN_DATALAYOUT_NCHW, DNN_DATALAYOUT_NHWC);
-
-            std::cout<< "buffer data = ";
-            printblob(bufferInputNC4HW4);
-//            std::cout<<std::endl;
-            std::cout<< "buffer shape = ";
-            shapePrint(bufferInputNC4HW4);
-//            std::cout<<std::endl;
-            // im2col pack layout
-
-
-            // winograd pack layout
-
-            // Upack, from NC4HW4 -> NCHW
-            printblob(inputs[0]);
-            dataLayoutConvert(bufferInputNC4HW4, inputs[0], DNN_DATALAYOUT_NHWC, DNN_DATALAYOUT_NCHW);
-            std::cout<< "after inputs[0] shape = ";
-            shapePrint(inputs[0]);
-            printblob(inputs[0]);
             // default branch
-            ParallelConv::run(inputs[0], outputs[0], weightsMat, biasvec, reluslope,
+            ParallelConv::run(inputs[0], outputs[0], weightsMatAlign, biasvec, reluslope,
                             kernel_size, strides, pads_begin, pads_end, dilations, activ.get(), ngroups, nstripes);
         }
     }

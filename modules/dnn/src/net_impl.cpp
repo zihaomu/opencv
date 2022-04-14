@@ -613,6 +613,18 @@ void Net::Impl::allocateLayers(const std::vector<LayerPin>& blobsToKeep_)
 
     layersTimings.resize(lastLayerId + 1, 0);
     fuseLayers(blobsToKeep_);
+
+    for (MapIdToLayerData::const_iterator it = layers.begin(); it != layers.end(); it++)
+    {
+        int lid = it->first;
+        LayerData &ld = layers[lid];
+        if (ld.skip)
+        {
+            continue;
+        }
+        Ptr<Layer>& currLayer = ld.layerInstance;
+        currLayer->afterFuse();
+    }
 }
 
 
@@ -626,6 +638,8 @@ void Net::Impl::forwardLayer(LayerData& ld)
     {
         TickMeter tm;
         tm.start();
+
+//        std::cout<<"forward name = "<<ld.name<<std::endl;
 
 #ifndef HAVE_VULKAN
         std::map<int, Ptr<BackendNode>>::const_iterator it = ld.backendNodes.find(preferableBackend);
@@ -858,6 +872,8 @@ void Net::Impl::forwardLayer(LayerData& ld)
     }
 
     ld.flag = 1;
+//    if (!ld.outputBlobs.empty())
+//        printblob(ld.outputBlobs[0]);
 }
 
 
