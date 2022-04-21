@@ -253,6 +253,8 @@ std::wstring GetTempFileNameWinRT(std::wstring prefix)
 
 #ifdef _OPENMP
 #include "omp.h"
+//    #include "/opt/homebrew/opt/libomp/include/omp.h"
+//#include "/Users/zihaomu/work/mooLab/libomp/include/omp.h"
 #endif
 
 #if defined __unix__ || defined __APPLE__ || defined __EMSCRIPTEN__ || defined __FreeBSD__ || defined __GLIBC__ || defined __HAIKU__

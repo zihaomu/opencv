@@ -120,7 +120,9 @@
     #include <hpx/include/threadmanager.hpp>
 
 #elif defined HAVE_OPENMP
-    #include <omp.h>
+#include <omp.h>
+//    #include "/opt/homebrew/opt/libomp/include/omp.h"
+//#include "/Users/zihaomu/work/mooLab/libomp/include/omp.h"
 #elif defined HAVE_GCD
     #include <dispatch/dispatch.h>
     #include <pthread.h>

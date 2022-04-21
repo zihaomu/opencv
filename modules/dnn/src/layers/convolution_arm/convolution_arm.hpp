@@ -14,6 +14,10 @@
 #include "convolution_sgemm_pack8.hpp"
 #include "convolution_pack4.hpp"
 #include "convolution_pack8.hpp"
+
+#include "fast_conv_2d.hpp"
+#include "conv_2d_3x3s1_winograd.hpp"
+
 //#include "convolution_sgemm_pack8.hpp"
 #if __ARM_NEON
 

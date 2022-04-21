@@ -1696,13 +1696,13 @@ public:
 TEST_P(Test_ONNX_nets, MooSpeed_Test)
 {
     // load input
-    Mat image = imread("/home/moo/model_test/img/junco.jpeg");
+    Mat image = imread("/Users/zihaomu/work/opencv_dev/data_test/imgs/junco.jpeg");
     Scalar meanValue(0.485, 0.456, 0.406);
     Scalar stdValue(0.229, 0.224, 0.225);
 
     Mat blob = blobFromImage(image, 1.0/255.0,Size(224, 224), meanValue, false);
     blob /= stdValue;
-    Net net = readNetFromONNX("/home/moo/model_test/models/resnet50-v1-12.onnx");
+    Net net = readNetFromONNX("/Users/zihaomu/work/opencv_dev/data_test/models/resnet50-v1-12.onnx");
 
     // set Default backend
     net.setPreferableBackend(DNN_BACKEND_DEFAULT);
@@ -1713,7 +1713,7 @@ TEST_P(Test_ONNX_nets, MooSpeed_Test)
     cv::TickMeter tickmeter;
     std::vector<double> times;
     std::vector<double> times_padding;
-    for(int i = 0; i < 100; i++)
+    for(int i = 0; i < 10; i++)
     {
         tickmeter.reset();
         tickmeter.start();

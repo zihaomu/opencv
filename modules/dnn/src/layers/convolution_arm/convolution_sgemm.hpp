@@ -15,8 +15,8 @@ namespace cv { namespace dnn {
 //static void im2col_sgemm(Mat& input, Mat& output, Mat& colKernel, const std::vector<float>& bias, const std::vector<float>& reluslope)
 static void im2col_sgemm(float* inputPtr0, size_t colW, size_t colH, Mat& output, Mat& colKernel, const std::vector<float>& bias, const std::vector<float>& reluslope)
 {
-    static TickMeter tickMeterTrans;
-    static TickMeter tickMeterMult;
+//    static TickMeter tickMeterTrans;
+//    static TickMeter tickMeterMult;
 
     enum { BLK_SIZE = 32, BLK_SIZE_CN = 64 };
     static const int valign = 8;
@@ -99,7 +99,7 @@ static void im2col_sgemm(float* inputPtr0, size_t colW, size_t colH, Mat& output
 //    }
 
     // Imp 2, first transpose, than, gemm.
-    tickMeterTrans.start();
+//    tickMeterTrans.start();
 //    Mat tmp;
 //    tmp.create(inW, inH, input.type());
     float * tmpPtr = tmpPtr0;
@@ -120,15 +120,14 @@ static void im2col_sgemm(float* inputPtr0, size_t colW, size_t colH, Mat& output
     }
 //    tmp = input.t();
 
-    tickMeterTrans.stop();
-    std::cout<<"transpose time = "<< tickMeterTrans.getTimeMilli()<<std::endl;
+//    tickMeterTrans.stop();
+//    std::cout<<"transpose time = "<< tickMeterTrans.getTimeMilli()<<std::endl;
 
     int temp = inW;
     inW = inH;
     inH = temp;
 
-
-    tickMeterMult.start();
+//    tickMeterMult.start();
 //    CV_Assert(tmp.isContinuous());
 #ifdef _OPENMP
 #pragma omp parallel for
@@ -174,8 +173,8 @@ static void im2col_sgemm(float* inputPtr0, size_t colW, size_t colH, Mat& output
     }
 
 
-    tickMeterMult.stop();
-    std::cout<<"Mult time = "<< tickMeterMult.getTimeMilli()<<std::endl;
+//    tickMeterMult.stop();
+//    std::cout<<"Mult time = "<< tickMeterMult.getTimeMilli()<<std::endl;
 }
 
 // Run in the layer initial stage.
@@ -281,7 +280,7 @@ static void convolution_im2col_sgemm(InputArray _input, OutputArray _output, Inp
 //            }
 //        }
 
-        tickMeterIm2Col.start();
+//        tickMeterIm2Col.start();
         // second imp, Ch, kh, kw, oh, ow, with permuate layer in the im2col sgemm.
         const int gap = inputW * stride_h - outputW * stride_w;
 #ifdef _OPENMP
@@ -315,8 +314,8 @@ static void convolution_im2col_sgemm(InputArray _input, OutputArray _output, Inp
             }
         }
 
-        tickMeterIm2Col.stop();
-        std::cout<<"Im2Col time = "<< tickMeterIm2Col.getTimeMilli()<<std::endl;
+//        tickMeterIm2Col.stop();
+//        std::cout<<"Im2Col time = "<< tickMeterIm2Col.getTimeMilli()<<std::endl;
 //        colInput = colInput.t();
         im2col_sgemm(tmpPtr0, colW, colH, output_i, colKernel, bias, reluslope);
     }
