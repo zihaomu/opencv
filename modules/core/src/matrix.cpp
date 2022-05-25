@@ -176,27 +176,23 @@ public:
     }
 };
 
-namespace
+static
+MatAllocator*& getDefaultAllocatorMatRef()
 {
-    MatAllocator* volatile g_matAllocator = NULL;
+    static MatAllocator* g_matAllocator = Mat::getStdAllocator();
+    return g_matAllocator;
 }
 
 MatAllocator* Mat::getDefaultAllocator()
 {
-    if (g_matAllocator == NULL)
-    {
-        cv::AutoLock lock(cv::getInitializationMutex());
-        if (g_matAllocator == NULL)
-        {
-            g_matAllocator = getStdAllocator();
-        }
-    }
-    return g_matAllocator;
+    return getDefaultAllocatorMatRef();
 }
+
 void Mat::setDefaultAllocator(MatAllocator* allocator)
 {
-    g_matAllocator = allocator;
+    getDefaultAllocatorMatRef() = allocator;
 }
+
 MatAllocator* Mat::getStdAllocator()
 {
     CV_SINGLETON_LAZY_INIT(MatAllocator, new StdMatAllocator())
@@ -668,6 +664,8 @@ void Mat::create(int d, const int* _sizes, int _type)
 
     if( data && (d == dims || (d == 1 && dims <= 2)) && _type == type() )
     {
+        if ( dims == 1 && (d == 1 && _sizes[0] == size[0]) )
+            return;
         if( d == 2 && rows == _sizes[0] && cols == _sizes[1] )
             return;
         for( i = 0; i < d; i++ )

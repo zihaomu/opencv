@@ -45,6 +45,7 @@
 #define OPENCV_CALIB3D_HPP
 
 #include "opencv2/core.hpp"
+#include "opencv2/core/types.hpp"
 #include "opencv2/features2d.hpp"
 #include "opencv2/core/affine.hpp"
 
@@ -3721,6 +3722,21 @@ void undistortPoints(InputArray src, OutputArray dst,
                      InputArray cameraMatrix, InputArray distCoeffs,
                      InputArray R, InputArray P, TermCriteria criteria);
 
+/**
+ * @brief Compute undistorted image points position
+ *
+ * @param src Observed points position, 2xN/Nx2 1-channel or 1xN/Nx1 2-channel (CV_32FC2 or
+CV_64FC2) (or vector\<Point2f\> ).
+ * @param dst Output undistorted points position (1xN/Nx1 2-channel or vector\<Point2f\> ).
+ * @param cameraMatrix Camera matrix \f$\vecthreethree{f_x}{0}{c_x}{0}{f_y}{c_y}{0}{0}{1}\f$ .
+ * @param distCoeffs Distortion coefficients
+ */
+CV_EXPORTS_W
+void undistortImagePoints(InputArray src, OutputArray dst, InputArray cameraMatrix,
+                          InputArray distCoeffs,
+                          TermCriteria = TermCriteria(TermCriteria::MAX_ITER + TermCriteria::EPS, 5,
+                                                      0.01));
+
 //! @} calib3d
 
 /** @brief The methods in this namespace use a so-called fisheye camera model.
@@ -3797,10 +3813,12 @@ namespace fisheye
     @param R Rectification transformation in the object space: 3x3 1-channel, or vector: 3x1/1x3
     1-channel or 1x1 3-channel
     @param P New camera intrinsic matrix (3x3) or new projection matrix (3x4)
+    @param criteria Termination criteria
     @param undistorted Output array of image points, 1xN/Nx1 2-channel, or vector\<Point2f\> .
      */
     CV_EXPORTS_W void undistortPoints(InputArray distorted, OutputArray undistorted,
-        InputArray K, InputArray D, InputArray R = noArray(), InputArray P  = noArray());
+        InputArray K, InputArray D, InputArray R = noArray(), InputArray P  = noArray(),
+                TermCriteria criteria = TermCriteria(TermCriteria::MAX_ITER + TermCriteria::EPS, 10, 1e-8));
 
     /** @brief Computes undistortion and rectification maps for image transform by #remap. If D is empty zero
     distortion is used, if R or P is empty identity matrixes are used.
