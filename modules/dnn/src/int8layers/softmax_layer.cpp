@@ -48,8 +48,9 @@ public:
 
     virtual bool supportBackend(int backendId) CV_OVERRIDE
     {
-        return backendId == DNN_BACKEND_OPENCV ||
-            (backendId == DNN_BACKEND_TIMVX && haveTimVX());
+        return backendId == DNN_BACKEND_OPENCV 
+        // || (backendId == DNN_BACKEND_TIMVX && haveTimVX())
+            ;
     }
 
     virtual bool tryFuse(Ptr<Layer>& top) CV_OVERRIDE

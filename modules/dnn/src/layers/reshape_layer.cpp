@@ -208,13 +208,13 @@ public:
     {
         if (backendId == DNN_BACKEND_TIMVX && haveTimVX())
         {
-            int len = this->type.length();
-            if (len <= 4)
-                return false;
+            // int len = this->type.length();
+            // if (len <= 4)
+            //     return false;
 
-            if (this->type.substr(len - 4) == "Int8")
-                return true;
-            else
+            // if (this->type.substr(len - 4) == "Int8")
+            //     return true;
+            // else
                 return false;
         }
 

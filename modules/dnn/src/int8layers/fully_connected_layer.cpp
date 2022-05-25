@@ -78,9 +78,9 @@ public:
     {
         if (backendId == DNN_BACKEND_TIMVX && haveTimVX())
         {
-           if (biasMat.empty())
-               return true;
-           else
+        //    if (biasMat.empty())
+        //        return true;
+        //    else
                return false;
         }
 

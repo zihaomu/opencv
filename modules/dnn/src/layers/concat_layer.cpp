@@ -120,14 +120,14 @@ public:
 #ifdef HAVE_TIMVX
         if (backendId == DNN_BACKEND_TIMVX && haveTimVX() && !padding)
         {
-            if (axis == -1)
-                return false;
-            int len = this->type.length();
-            if (len <= 4)
-                return false;
-            if (this->type.substr(len - 4) == "Int8")
-                return true;
-            else
+            // if (axis == -1)
+            //     return false;
+            // int len = this->type.length();
+            // if (len <= 4)
+            //     return false;
+            // if (this->type.substr(len - 4) == "Int8")
+            //     return true;
+            // else
                 return false;
         }
 #endif

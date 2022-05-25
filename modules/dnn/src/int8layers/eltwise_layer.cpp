@@ -137,7 +137,8 @@ public:
     {
         // For TimVX Backend, only ELTWISE_CHANNNELS_SAME was supported.
         if (backendId == DNN_BACKEND_TIMVX && haveTimVX())
-            return channelsModeInput == ELTWISE_CHANNNELS_SAME;
+            // return channelsModeInput == ELTWISE_CHANNNELS_SAME;
+            return false;
         return backendId == DNN_BACKEND_OPENCV;
     }
 

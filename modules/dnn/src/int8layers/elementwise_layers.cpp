@@ -51,9 +51,9 @@ public:
         if (backendId == DNN_BACKEND_TIMVX)
         {
             // TODO!: Leaky ReLU will be supported in future.
-            if (tvActType == tvActReLU && slope != 0.f)
+            // if (tvActType == tvActReLU && slope != 0.f)
                 return false;
-            return tvActType != tvActNotSupported;
+            // return tvActType != tvActNotSupported;
         }
 #endif
         return backendId == DNN_BACKEND_OPENCV;

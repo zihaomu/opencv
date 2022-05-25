@@ -107,7 +107,7 @@ public:
     {
         if (backendId == DNN_BACKEND_TIMVX && haveTimVX())
         {
-            return true;
+            return false;
         }
 
         return backendId == DNN_BACKEND_OPENCV;

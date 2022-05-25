@@ -163,7 +163,8 @@ public:
     {
         if (backendId == DNN_BACKEND_TIMVX && haveTimVX() && !isEltwise)
         {
-            return true;
+            return false;
+            // return true;
         }
         return backendId == DNN_BACKEND_OPENCV;
     }
