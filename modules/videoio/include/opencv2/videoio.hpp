@@ -123,6 +123,7 @@ enum VideoCaptureAPIs {
        CAP_INTEL_MFX    = 2300,         //!< Intel MediaSDK
        CAP_XINE         = 2400,         //!< XINE engine (Linux)
        CAP_UEYE         = 2500,         //!< uEye Camera API
+       CAP_OB3D         = 2600,         //!< Orbbec 3D Camera
      };
 
 /** @brief cv::VideoCapture generic properties identifier.

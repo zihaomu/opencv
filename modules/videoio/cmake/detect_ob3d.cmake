@@ -1,0 +1,20 @@
+# --- ob3d ---
+if(NOT HAVE_OB3D)
+  if(WIN32)
+    set(CMAKE_REQUIRED_QUIET TRUE) # for check_include_file
+    check_include_file(mfapi.h HAVE_MFAPI)
+    if(HAVE_MFAPI)
+      set(HAVE_OB3D TRUE)
+      set(HAVE_OB3D_MSMF TRUE)
+      ocv_add_external_target(ob3d "" "" "HAVE_OB3D;HAVE_OB3D_MSMF")
+    endif()
+  elseif(UNIX)
+    set(CMAKE_REQUIRED_QUIET TRUE) # for check_include_file
+    check_include_file(linux/videodev2.h HAVE_CAMV4L2)
+    if(HAVE_CAMV4L2)
+      set(HAVE_OB3D TRUE)
+      set(HAVE_OB3D_V4L2 TRUE)
+      ocv_add_external_target(ob3d "" "" "HAVE_OB3D;HAVE_OB3D_V4L2")
+    endif()
+  endif()
+endif()
