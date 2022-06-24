@@ -3,6 +3,7 @@
 // of this distribution and at http://opencv.org/license.html.
 #ifndef _CAP_OB3D_STREAM_CHANNEL_V4L2_HPP_
 #define _CAP_OB3D_STREAM_CHANNEL_V4L2_HPP_
+#include "cap_ob3d/ob3d_uvc_stream_channel.hpp"
 #ifdef HAVE_OB3D_V4L2
 namespace cv{
 namespace ob3d{

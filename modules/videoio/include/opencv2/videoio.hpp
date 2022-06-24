@@ -655,6 +655,19 @@ enum { CAP_PROP_IMAGES_BASE = 18000,
 
 //! @} Images
 
+/** @name OB3D (for Orbbec 3D camera)
+    @{
+*/
+//! OB3D data given from depth generator
+enum
+{
+  CAP_OB3D_DEPTH_MAP = 0, //!< Depth values in mm (CV_16UC1)
+  CAP_OB3D_BGR_IMAGE = 1, //!< Data given from RGB image sensor
+  CAP_OB3D_IR_IMAGE = 2   //!< Data given from IR image sensor(CV_16UC1)
+};
+
+//! @} OB3D
+
 //! @} videoio_flags_others
 
 
