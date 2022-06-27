@@ -1,10 +1,10 @@
 // This file is part of OpenCV project.
 // It is subject to the license terms in the LICENSE file found in the top-level directory
 // of this distribution and at http://opencv.org/license.html.
-#ifndef _CAP_OB3D_STREAM_CHANNEL_INTERFACE_HPP_
-#define _CAP_OB3D_STREAM_CHANNEL_INTERFACE_HPP_
+#ifndef _CAP_OB_SENSOR_STREAM_CHANNEL_INTERFACE_HPP_
+#define _CAP_OB_SENSOR_STREAM_CHANNEL_INTERFACE_HPP_
 
-#ifdef HAVE_OB3D
+#ifdef HAVE_OB_SENSOR
 
 #include "../precomp.hpp"
 
@@ -13,7 +13,7 @@
 #include <memory>
 
 namespace cv{
-namespace ob3d{
+namespace obsensor{
     typedef enum
     {
         OB3D_STREAM_IR = 1,
@@ -59,11 +59,11 @@ namespace ob3d{
 
         virtual StreamType streamType() const = 0;
     };
-
+    
     // "StreamChannelGroup" mean a group of stream channels from same one physical device
     std::vector<std::shared_ptr<IStreamChannel>> getStreamChannelGroup(uint32_t groupIdx = 0);
 
-} // namespace ob3d
+} // namespace obsensor
 } // namespace cv
-#endif // HAVE_OB3D
-#endif // _CAP_OB3D_STREAM_CHANNEL_INTERFACE_HPP_
+#endif // HAVE_OB_SENSOR
+#endif // _CAP_OB_SENSOR_STREAM_CHANNEL_INTERFACE_HPP_

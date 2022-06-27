@@ -2,9 +2,9 @@
 // It is subject to the license terms in the LICENSE file found in the top-level directory
 // of this distribution and at http://opencv.org/license.html.
 
-#ifdef HAVE_OB3D_MSMF
+#ifdef HAVE_OB_SENSOR_MSMF
 
-#include "ob3d_stream_channel_msmf.hpp"
+#include "obsensor_stream_channel_msmf.hpp"
 
 #include <shlwapi.h> // QISearch
 
@@ -18,7 +18,7 @@
 
 namespace cv
 {
-    namespace ob3d
+    namespace obsensor
     {
         std::string wideCharToUTF8(const WCHAR *s)
         {
@@ -406,7 +406,7 @@ namespace cv
             }
             return S_OK;
         }
-
-    } // namespace ob3d
+obsensor
+    } // namespace obsensor
 } // namespace cv
-#endif // HAVE_OB3D_MSMF
+#endif // HAVE_OB_SENSOR_MSMF

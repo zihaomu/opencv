@@ -2,14 +2,14 @@
 // It is subject to the license terms in the LICENSE file found in the top-level directory
 // of this distribution and at http://opencv.org/license.html.
 
-#ifndef _CAP_OB3D_UVC_STREAM_CHANNEL_HPP_
-#define _CAP_OB3D_UVC_STREAM_CHANNEL_HPP_
-#include "ob3d_stream_channel_interface.hpp"
+#ifndef _CAP_OB_SENSOR_UVC_STREAM_CHANNEL_HPP_
+#define _CAP_OB_SENSOR_UVC_STREAM_CHANNEL_HPP_
+#include "obsensor_stream_channel_interface.hpp"
 
-#ifdef HAVE_OB3D
+#ifdef HAVE_OB_SENSOR
 namespace cv
 {
-    namespace ob3d
+    namespace obsensor
     {
 
 #define OB3D_CAM_PID 0x2bc5 // usb pid
@@ -34,7 +34,7 @@ namespace cv
         StreamType parseUvcDeviceNameToStreamType(const std::string &devName);
         FrameFormat frameFourccToFormat(uint32_t fourcc);
 
-    } // namespace ob3d
+    } // namespace obsensor
 } // namespace cv
-#endif // HAVE_OB3D
-#endif // _CAP_OB3D_UVC_STREAM_CHANNEL_HPP_
+#endif // HAVE_OB_SENSOR
+#endif // _CAP_OB_SENSOR_UVC_STREAM_CHANNEL_HPP_

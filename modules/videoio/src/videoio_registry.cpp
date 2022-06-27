@@ -172,8 +172,8 @@ static const struct VideoBackendInfo builtin_backends[] =
                            0)
 #endif
 
-#ifdef HAVE_OB3D
-    DECLARE_STATIC_BACKEND(CAP_OB3D, "OB3D", MODE_CAPTURE_BY_INDEX, 0, create_ob3d_capture, 0)
+#ifdef HAVE_OB_SENSOR
+    DECLARE_STATIC_BACKEND(CAP_OB_SENSOR, "OB3D", MODE_CAPTURE_BY_INDEX, 0, create_obsensor_capture, 0)
 #endif
 
     // dropped backends: MIL, TYZX

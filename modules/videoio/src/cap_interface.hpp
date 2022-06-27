@@ -411,7 +411,7 @@ Ptr<IVideoCapture> createXINECapture(const std::string &filename);
 Ptr<IVideoCapture> createAndroidCapture_cam( int index );
 Ptr<IVideoCapture> createAndroidCapture_file(const std::string &filename);
 
-Ptr<IVideoCapture> create_ob3d_capture(int index);
+Ptr<IVideoCapture> create_obsensor_capture(int index);
 
 bool VideoCapture_V4L_waitAny(
         const std::vector<VideoCapture>& streams,

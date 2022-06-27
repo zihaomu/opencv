@@ -1,11 +1,11 @@
 // This file is part of OpenCV project.
 // It is subject to the license terms in the LICENSE file found in the top-level directory
 // of this distribution and at http://opencv.org/license.html.
-#ifndef _CAP_OB3D_STREAM_CHANNEL_MSMF_HPP_
-#define _CAP_OB3D_STREAM_CHANNEL_MSMF_HPP_
-#ifdef HAVE_OB3D_MSMF
+#ifndef _CAP_OB_SENSOR_STREAM_CHANNEL_MSMF_HPP_
+#define _CAP_OB_SENSOR_STREAM_CHANNEL_MSMF_HPP_
+#ifdef HAVE_OB_SENSOR_MSMF
 
-#include "ob3d_uvc_stream_channel.hpp"
+#include "obsensor_uvc_stream_channel.hpp"
 
 #include <windows.h>
 #include <guiddef.h>
@@ -22,7 +22,7 @@
 #include <mutex>
 
 namespace cv{
-namespace ob3d{
+namespace obsensor{
     template <class T>
     class ComPtr
     {
@@ -152,7 +152,7 @@ namespace ob3d{
     private:
         long refCount_ = 1;
     };
-} // namespace ob3d
-} // namespace cv::ob3d
-#endif // HAVE_OB3D_MSMF
-#endif // _CAP_OB3D_STREAM_CHANNEL_MSMF_HPP_
+} // namespace obsensor
+} // namespace cv::obsensor
+#endif // HAVE_OB_SENSOR_MSMF
+#endif // _CAP_OB_SENSOR_STREAM_CHANNEL_MSMF_HPP_

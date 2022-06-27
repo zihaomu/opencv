@@ -2,22 +2,22 @@
 // It is subject to the license terms in the LICENSE file found in the top-level directory
 // of this distribution and at http://opencv.org/license.html.
 
-#ifndef _CAP_OB3D_CAPTURE__HPP_
-#define _CAP_OB3D_CAPTURE__HPP_
+#ifndef _CAP_OB_SENSOR_CAPTURE__HPP_
+#define _CAP_OB_SENSOR_CAPTURE__HPP_
 
 #include <map>
 #include <mutex>
 
-#include "cap_ob3d/ob3d_stream_channel_interface.hpp"
+#include "cap_obsensor/obsensor_stream_channel_interface.hpp"
 
-#ifdef HAVE_OB3D
+#ifdef HAVE_OB_SENSOR
 namespace cv
 {
-class VideoCapture_ob3d : public IVideoCapture
+class VideoCapture_obsensor : public IVideoCapture
 {
 public:
-    VideoCapture_ob3d(int index);
-    virtual ~VideoCapture_ob3d(){};
+    VideoCapture_obsensor(int index);
+    virtual ~VideoCapture_obsensor(){};
 
     virtual double getProperty(int propIdx) const CV_OVERRIDE{
         // todo
@@ -34,7 +34,7 @@ public:
     };
     virtual bool retrieveFrame(int outputType, OutputArray frame) CV_OVERRIDE;
     virtual int getCaptureDomain() CV_OVERRIDE{
-        return CAP_OB3D;
+        return CAP_OB_SENSOR;
     };
     virtual bool isOpened() const CV_OVERRIDE{
         return isOpened_;
@@ -44,11 +44,11 @@ private:
     bool isOpened_;
     std::mutex frameSetMutex_;
     std::map<int, Mat> frameSet_;
-    std::vector<std::shared_ptr<ob3d::IStreamChannel>> streamChannelGroup_;
+    std::vector<std::shared_ptr<obsensor::IStreamChannel>> streamChannelGroup_;
     Mat depthFrame_;
     Mat irFrame_;
     Mat rgbFrame_;
 };
 } // namespace cv
-#endif // HAVE_OB3D
-#endif // _CAP_OB3D_CAPTURE__HPP_
+#endif // HAVE_OB_SENSOR
+#endif // _CAP_OB_SENSOR_CAPTURE__HPP_
