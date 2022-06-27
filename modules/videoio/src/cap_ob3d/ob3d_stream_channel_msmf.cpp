@@ -1,9 +1,11 @@
 // This file is part of OpenCV project.
 // It is subject to the license terms in the LICENSE file found in the top-level directory
 // of this distribution and at http://opencv.org/license.html.
-#include "precomp.hpp"
+
+#ifdef HAVE_OB3D_MSMF
 
 #include "ob3d_stream_channel_msmf.hpp"
+
 #include <shlwapi.h> // QISearch
 
 #pragma warning(disable : 4503)
@@ -14,7 +16,6 @@
 #pragma comment(lib, "Mfreadwrite")
 #pragma comment(lib, "dxgi")
 
-#ifdef HAVE_OB3D_MSMF
 namespace cv
 {
     namespace ob3d

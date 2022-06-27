@@ -3,6 +3,8 @@
 // of this distribution and at http://opencv.org/license.html.
 #ifndef _CAP_OB3D_STREAM_CHANNEL_MSMF_HPP_
 #define _CAP_OB3D_STREAM_CHANNEL_MSMF_HPP_
+#ifdef HAVE_OB3D_MSMF
+
 #include "ob3d_uvc_stream_channel.hpp"
 
 #include <windows.h>
@@ -19,7 +21,6 @@
 #include <comdef.h>
 #include <mutex>
 
-#ifdef HAVE_OB3D_MSMF
 namespace cv{
 namespace ob3d{
     template <class T>

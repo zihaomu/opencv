@@ -4,10 +4,14 @@
 #ifndef _CAP_OB3D_STREAM_CHANNEL_INTERFACE_HPP_
 #define _CAP_OB3D_STREAM_CHANNEL_INTERFACE_HPP_
 
+#ifdef HAVE_OB3D
+
+#include "../precomp.hpp"
+
 #include <functional>
 #include <vector>
+#include <memory>
 
-#ifdef HAVE_OB3D
 namespace cv{
 namespace ob3d{
     typedef enum
@@ -57,7 +61,7 @@ namespace ob3d{
     };
 
     // "StreamChannelGroup" mean a group of stream channels from same one physical device
-    std::vector<Ptr<IStreamChannel>> getStreamChannelGroup(uint32_t groupIdx = 0);
+    std::vector<std::shared_ptr<IStreamChannel>> getStreamChannelGroup(uint32_t groupIdx = 0);
 
 } // namespace ob3d
 } // namespace cv

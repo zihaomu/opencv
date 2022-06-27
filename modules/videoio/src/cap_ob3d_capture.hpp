@@ -44,7 +44,7 @@ private:
     bool isOpened_;
     std::mutex frameSetMutex_;
     std::map<int, Mat> frameSet_;
-    std::vector<Ptr<ob3d::IStreamChannel>> streamChannelGroup_;
+    std::vector<std::shared_ptr<ob3d::IStreamChannel>> streamChannelGroup_;
     Mat depthFrame_;
     Mat irFrame_;
     Mat rgbFrame_;
