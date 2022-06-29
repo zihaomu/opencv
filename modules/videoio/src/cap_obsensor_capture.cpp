@@ -28,22 +28,22 @@ namespace cv
                 switch (streamType)
                 {
                 case obsensor::OB3D_STREAM_RGB:
-                    channel->start(rgbProfile, [&](obsensor::Frame *frame){
-                        std::unique_lock<std::mutex> lk(frameSetMutex_);
-                        rgbFrame_ = Mat( 1, frame->dataSize, CV_8UC1, frame->data ).clone(); 
-                    });
+                    channel->start(rgbProfile, [&](obsensor::Frame *frame)
+                                   {
+                        std::unique_lock<std::mutex> lk(frameMutex_);
+                        rgbFrame_ = Mat( 1, frame->dataSize, CV_8UC1, frame->data ).clone(); });
                     break;
                 case obsensor::OB3D_STREAM_DEPTH:
-                    channel->start(depthProfile, [&](obsensor::Frame *frame){ 
-                        std::unique_lock<std::mutex> lk(frameSetMutex_);
-                        depthFrame_ =  Mat(frame->height, frame->width, CV_16UC1, frame->data, frame->width*2).clone(); 
-                    });
+                    channel->start(depthProfile, [&](obsensor::Frame *frame)
+                                   { 
+                        std::unique_lock<std::mutex> lk(frameMutex_);
+                        depthFrame_ =  Mat(frame->height, frame->width, CV_16UC1, frame->data, frame->width*2).clone(); });
                     break;
                 case obsensor::OB3D_STREAM_IR:
-                    channel->start(irProfile, [&](obsensor::Frame *frame){ 
-                        std::unique_lock<std::mutex> lk(frameSetMutex_);
-                        irFrame_ =  Mat(frame->height, frame->width, CV_16UC1, frame->data, frame->width*2).clone(); 
-                    });
+                    channel->start(irProfile, [&](obsensor::Frame *frame)
+                                   { 
+                        std::unique_lock<std::mutex> lk(frameMutex_);
+                        irFrame_ =  Mat(frame->height, frame->width, CV_16UC1, frame->data, frame->width*2).clone(); });
                     break;
                 default:
                     break;
@@ -53,24 +53,59 @@ namespace cv
         }
     }
 
+    bool VideoCapture_obsensor::grabFrame()
+    {
+        std::unique_lock<std::mutex> lk(frameMutex_);
+
+        grabbedDepthFrame_ = depthFrame_;
+        grabbedIrFrame_ = irFrame_;
+        grabbedRgbFrame_ = rgbFrame_;
+
+        depthFrame_.release();
+        irFrame_.release();
+        rgbFrame_.release();
+
+        return !grabbedDepthFrame_.empty() || !grabbedIrFrame_.empty() || !grabbedRgbFrame_.empty();
+    }
+
     bool VideoCapture_obsensor::retrieveFrame(int outputType, OutputArray frame)
     {
-        std::unique_lock<std::mutex> lk(frameSetMutex_);
-        if (outputType == CAP_OB_SENSOR_DEPTH_MAP && !depthFrame_.empty())
+        std::unique_lock<std::mutex> lk(frameMutex_);
+        switch (outputType)
         {
-            depthFrame_.copyTo(frame);
-            return true;
+        case CAP_OB_SENSOR_DEPTH_MAP:
+            if (!grabbedDepthFrame_.empty())
+            {
+                grabbedDepthFrame_.copyTo(frame);
+                grabbedDepthFrame_.release();
+                return true;
+            }
+            break;
+        case CAP_OB_SENSOR_IR_IMAGE:
+            if (!grabbedIrFrame_.empty())
+            {
+                grabbedIrFrame_.copyTo(frame);
+                grabbedIrFrame_.release();
+                return true;
+            }
+            break;
+        case CAP_OB_SENSOR_BGR_IMAGE:
+            if (!grabbedRgbFrame_.empty())
+            {
+                auto mat = imdecode(grabbedRgbFrame_, IMREAD_COLOR);
+                grabbedRgbFrame_.release();
+
+                if (!mat.empty())
+                {
+                    mat.copyTo(frame);
+                    return true;
+                }
+            }
+            break;
+        default:
+            break;
         }
-        else if (outputType == CAP_OB_SENSOR_IR_IMAGE && !irFrame_.empty())
-        {
-            irFrame_.copyTo(frame);
-            return true;
-        }
-        else if (outputType == CAP_OB_SENSOR_BGR_IMAGE && !rgbFrame_.empty())
-        {
-            imdecode(rgbFrame_, IMREAD_COLOR).copyTo(frame);
-            return true;
-        }
+
         return false;
     }
 

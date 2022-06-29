@@ -22,32 +22,33 @@ public:
     virtual double getProperty(int propIdx) const CV_OVERRIDE{
         // todo
         return 0.0;
-    };
+    }
     virtual bool setProperty(int propIdx, double propVal) CV_OVERRIDE{
         // todo
         return false;
-    };
-
-    virtual bool grabFrame() CV_OVERRIDE{
-        // todo
-        return true;
-    };
+    }
+    virtual bool grabFrame() CV_OVERRIDE;
     virtual bool retrieveFrame(int outputType, OutputArray frame) CV_OVERRIDE;
     virtual int getCaptureDomain() CV_OVERRIDE{
         return CAP_OB_SENSOR;
-    };
+    }
     virtual bool isOpened() const CV_OVERRIDE{
         return isOpened_;
-    };
+    }
 
 private:
     bool isOpened_;
-    std::mutex frameSetMutex_;
-    std::map<int, Mat> frameSet_;
     std::vector<std::shared_ptr<obsensor::IStreamChannel>> streamChannelGroup_;
+
+    std::mutex frameMutex_;
+
     Mat depthFrame_;
     Mat irFrame_;
     Mat rgbFrame_;
+
+    Mat grabbedDepthFrame_;
+    Mat grabbedIrFrame_;
+    Mat grabbedRgbFrame_;
 };
 } // namespace cv
 #endif // HAVE_OB_SENSOR

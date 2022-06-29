@@ -94,7 +94,8 @@ namespace obsensor{
         ~MFContext(void);
         static MFContext &getInstance();
 
-        std::vector<UvcDeviceInfo> queryUvcDeviceList();
+        std::vector<UvcDeviceInfo> queryUvcDeviceInfoList();
+        std::shared_ptr<IStreamChannel> createStreamChannel(const UvcDeviceInfo &devInfo);
 
     private:
         MFContext(void);

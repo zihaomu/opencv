@@ -15,12 +15,12 @@ namespace cv
 #define OB3D_CAM_PID 0x2bc5 // usb pid
         struct UvcDeviceInfo
         {
-            std::string id = "";
+            std::string id = ""; // uvc sub-device id
             std::string name = "";
-            std::string uid = "";
+            std::string uid = ""; // parent usb device id
             uint16_t vid = 0;
             uint16_t pid = 0;
-            uint16_t mi = 0;
+            uint16_t mi = 0; // uvc interface index
         };
 
         typedef enum
@@ -33,6 +33,10 @@ namespace cv
 
         StreamType parseUvcDeviceNameToStreamType(const std::string &devName);
         FrameFormat frameFourccToFormat(uint32_t fourcc);
+        uint32_t frameFormatToForucc(FrameFormat);
+
+        // class UvcStreamChannelContext{
+        // }
 
     } // namespace obsensor
 } // namespace cv

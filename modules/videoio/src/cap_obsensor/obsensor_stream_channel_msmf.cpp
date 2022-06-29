@@ -146,7 +146,7 @@ namespace cv
             return instance;
         }
 
-        std::vector<UvcDeviceInfo> MFContext::queryUvcDeviceList()
+        std::vector<UvcDeviceInfo> MFContext::queryUvcDeviceInfoList()
         {
             std::vector<UvcDeviceInfo> uvcDevList;
             ComPtr<IMFAttributes> pAttributes = nullptr;
@@ -181,16 +181,21 @@ namespace cv
             return uvcDevList;
         }
 
+        std::shared_ptr<IStreamChannel> MFContext::createStreamChannel(const UvcDeviceInfo &devInfo)
+        {
+            return std::make_shared<MSMFStreamChannel>(devInfo);
+        }
+
         MFContext::MFContext()
         {
             CoInitialize(0);
             CV_Assert(SUCCEEDED(MFStartup(MF_VERSION)));
         }
 
-        MSMFStreamChannel::MSMFStreamChannel(const UvcDeviceInfo &devInfo) : devInfo_(devInfo), mfContext_(MFContext::getInstance())
+        MSMFStreamChannel::MSMFStreamChannel(const UvcDeviceInfo &devInfo) : devInfo_(devInfo),
+                                                                             streamType_(parseUvcDeviceNameToStreamType(devInfo_.name)),
+                                                                             mfContext_(MFContext::getInstance())
         {
-            streamType_ = parseUvcDeviceNameToStreamType(devInfo_.name);
-
             HR_FAILED_RETURN(MFCreateAttributes(&deviceAttrs_, 2));
             HR_FAILED_RETURN(deviceAttrs_->SetGUID(MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE, MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_GUID));
             WCHAR *buffer = new wchar_t[devInfo_.id.length() + 1];
