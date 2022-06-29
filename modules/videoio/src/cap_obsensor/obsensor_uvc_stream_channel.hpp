@@ -33,7 +33,7 @@ namespace cv
 
         StreamType parseUvcDeviceNameToStreamType(const std::string &devName);
         FrameFormat frameFourccToFormat(uint32_t fourcc);
-        uint32_t frameFormatToForucc(FrameFormat);
+        uint32_t frameFormatToFourcc(FrameFormat);
 
         // class UvcStreamChannelContext{
         // }

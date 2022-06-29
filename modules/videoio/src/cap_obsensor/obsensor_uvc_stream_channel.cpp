@@ -7,7 +7,7 @@
 #include <vector>
 #include <string>
 #include <algorithm>
-#include<iterator>
+#include <iterator>
 
 #if defined(HAVE_OB_SENSOR_V4L2)
 #include "obsensor_stream_channel_v4l2.hpp"
@@ -20,8 +20,13 @@ namespace cv
     namespace obsensor
     {
 
-#define fourCc2Int(a, b, c, d)\ 
+#if defined(HAVE_OB_SENSOR_V4L2)
+#define fourCc2Int(a, b, c, d) \
     ((uint32_t)(a) | ((uint32_t)(b) << 8) | ((uint32_t)(c) << 16) | ((uint32_t)(d) << 24))
+#elif defined(HAVE_OB_SENSOR_MSMF)
+#define fourCc2Int(a, b, c, d) \
+    (((uint32_t)(a) <<24) | ((uint32_t)(b) << 16) | ((uint32_t)(c) << 8) | (uint32_t)(d))
+#endif // HAVE_OB_SENSOR_V4L2
 
         const std::map<uint32_t, FrameFormat> fourccToOBFormat = {
             // {fourCc2Int('U', 'Y', 'V', 'Y'), FRAME_FORMAT_UYVY},
@@ -70,7 +75,7 @@ namespace cv
             return FRAME_FORMAT_UNKNOWN;
         }
 
-        uint32_t frameFormatToForucc(FrameFormat fmt)
+        uint32_t frameFormatToFourcc(FrameFormat fmt)
         {
             for (const auto &item : fourccToOBFormat)
             {

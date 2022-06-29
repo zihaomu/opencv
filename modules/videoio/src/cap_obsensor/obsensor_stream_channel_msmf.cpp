@@ -411,7 +411,6 @@ namespace cv
             }
             return S_OK;
         }
-obsensor
     } // namespace obsensor
 } // namespace cv
 #endif // HAVE_OB_SENSOR_MSMF
