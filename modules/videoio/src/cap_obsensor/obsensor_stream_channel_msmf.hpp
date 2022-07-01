@@ -1,9 +1,9 @@
 // This file is part of OpenCV project.
 // It is subject to the license terms in the LICENSE file found in the top-level directory
 // of this distribution and at http://opencv.org/license.html.
-#ifndef _CAP_OB_SENSOR_STREAM_CHANNEL_MSMF_HPP_
-#define _CAP_OB_SENSOR_STREAM_CHANNEL_MSMF_HPP_
-#ifdef HAVE_OB_SENSOR_MSMF
+#ifndef _CAP_OBSENSOR_STREAM_CHANNEL_MSMF_HPP_
+#define _CAP_OBSENSOR_STREAM_CHANNEL_MSMF_HPP_
+#ifdef HAVE_OBSENSOR_MSMF
 
 #include "obsensor_uvc_stream_channel.hpp"
 
@@ -20,6 +20,9 @@
 #include <ks.h>
 #include <comdef.h>
 #include <mutex>
+#include <vidcap.h> //IKsTopologyInfo
+#include <ksproxy.h> //IKsControl
+#include <ksmedia.h> 
 
 namespace cv{
 namespace obsensor{
@@ -115,10 +118,14 @@ namespace obsensor{
 
         virtual void start(const StreamProfile &profile, FrameCallback frameCallback) override;
         virtual void stop() override;
-        virtual bool setProperty(int obPropId, const uint8_t *data, uint32_t dataSize) override;
-        virtual bool getProperty(int obPropId, uint8_t *outData, uint32_t outDataSize) override;
+        virtual bool setProperty(int propId, const uint8_t *data, uint32_t dataSize) override;
+        virtual bool getProperty(int propId, uint8_t *recvData, uint32_t recvDataSize) override;
 
         virtual StreamType streamType() const override;
+
+    private:
+        bool setXu(uint8_t ctrl, const uint8_t *data, uint32_t len);
+        bool getXu(uint8_t ctrl, uint8_t **data, uint32_t *len);
 
     private:
         MFContext &mfContext_;
@@ -131,6 +138,10 @@ namespace obsensor{
         ComPtr<IMFSourceReader> streamReader_ = nullptr;
         ComPtr<IAMCameraControl> cameraControl_ = nullptr;
         ComPtr<IAMVideoProcAmp> videoProcAmp_ = nullptr;
+        ComPtr<IKsTopologyInfo> xuKsTopologyInfo_ = nullptr;
+        ComPtr<IUnknown> xuNodeInstance_ = nullptr;
+        ComPtr<IKsControl> xuKsControl_ = nullptr;
+        int xuNodeId_;
 
         FrameCallback frameCallback_;
         StreamProfile currentProfile_;
@@ -139,6 +150,9 @@ namespace obsensor{
         StreamState streamState_;
         std::mutex streamStateMutex_;
         std::condition_variable streamStateCv_;
+
+        uint8_t *xuRecvBuf_;
+        uint8_t *xuSendBuf_;
 
     public:
         STDMETHODIMP QueryInterface(REFIID iid, void **ppv) override;
@@ -155,5 +169,5 @@ namespace obsensor{
     };
 } // namespace obsensor
 } // namespace cv::obsensor
-#endif // HAVE_OB_SENSOR_MSMF
-#endif // _CAP_OB_SENSOR_STREAM_CHANNEL_MSMF_HPP_
+#endif // HAVE_OBSENSOR_MSMF
+#endif // _CAP_OBSENSOR_STREAM_CHANNEL_MSMF_HPP_

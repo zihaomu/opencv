@@ -459,9 +459,9 @@ OCV_OPTION(WITH_ONNX "Include Microsoft ONNX Runtime support" OFF
 OCV_OPTION(WITH_TIMVX "Include Tim-VX support" OFF
   VISIBLE_IF TRUE
   VERIFY HAVE_TIMVX)
-OCV_OPTION(WITH_OB_SENSOR "Include Orbbec 3D Sensor support (Astra+/Femto)" OFF
+OCV_OPTION(WITH_OBSENSOR "Include Orbbec 3D Sensor support (Astra+/Femto)" OFF
   VISIBLE_IF (WIN32 AND NOT ARM AND NOT WINRT) OR ( UNIX AND NOT APPLE AND NOT ANDROID)
-  VERIFY HAVE_OB_SENSOR)
+  VERIFY HAVE_OBSENSOR)
 
 # OpenCV build components
 # ===================================================

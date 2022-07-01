@@ -5,7 +5,7 @@
 using namespace cv;
 int main(int argc, char *argv[])
 {
-    VideoCapture obsensorCapture(0, CAP_OB_SENSOR);
+    VideoCapture obsensorCapture(0, CAP_OBSENSOR);
 
     Mat image;
     Mat depthMap;
@@ -22,25 +22,44 @@ int main(int argc, char *argv[])
         //     applyColorMap(adjDepthMap, adjDepthMap, COLORMAP_JET);
         //     imshow("DEPTH", adjDepthMap);
         // }
-
         if(obsensorCapture.grab()){
-            if (obsensorCapture.retrieve(image, CAP_OB_SENSOR_BGR_IMAGE))
+            if (obsensorCapture.retrieve(image, CAP_OBSENSOR_BGR_IMAGE))
             {
                 imshow("RGB", image);
             }
 
-            if (obsensorCapture.retrieve(depthMap, CAP_OB_SENSOR_DEPTH_MAP))
+            if (obsensorCapture.retrieve(depthMap, CAP_OBSENSOR_DEPTH_MAP))
             {
                 normalize(depthMap, adjDepthMap, 0, 255, NORM_MINMAX, CV_8UC1);
                 applyColorMap(adjDepthMap, adjDepthMap, COLORMAP_JET);
                 imshow("DEPTH", adjDepthMap);
             }
 
-            if (obsensorCapture.retrieve(irImage, CAP_OB_SENSOR_IR_IMAGE))
+            if (obsensorCapture.retrieve(irImage, CAP_OBSENSOR_IR_IMAGE))
             {
                 normalize(irImage, adjIrImage, 0, 255, NORM_MINMAX, CV_8UC1);
                 imshow("IR", adjIrImage);
             }
+
+            const float alpha = 0.6f;
+            if(!image.empty() && !depthMap.empty()){
+                normalize(depthMap, adjDepthMap, 0, 255, NORM_MINMAX, CV_8UC1);
+                cv::resize(adjDepthMap, adjDepthMap, cv::Size(image.cols, image.rows));
+                for(int i = 0; i < image.rows; i++) {
+                    for(int j = 0; j < image.cols; j++) {
+                        cv::Vec3b &outRgb    = image.at<cv::Vec3b>(i, j);
+                        uint8_t depthValue =   255 - adjDepthMap.at<uint8_t>(i, j);
+                        if(depthValue != 0 && depthValue!=255){
+                            outRgb[0] = (uint8_t)(outRgb[0] * (1.0f - alpha) + depthValue *  alpha);
+                            outRgb[1] = (uint8_t)(outRgb[1] * (1.0f - alpha) + depthValue *  alpha);
+                            outRgb[2] = (uint8_t)(outRgb[2] * (1.0f - alpha) + depthValue *  alpha);
+                        }
+                    }
+                }
+                imshow("DepthToColor", image);
+            }
+            image.release();
+            depthMap.release();
         }
 
         if (waitKey(30) >= 0)

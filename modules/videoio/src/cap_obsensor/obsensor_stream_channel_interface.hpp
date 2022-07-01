@@ -1,12 +1,12 @@
 // This file is part of OpenCV project.
 // It is subject to the license terms in the LICENSE file found in the top-level directory
 // of this distribution and at http://opencv.org/license.html.
-#ifndef _CAP_OB_SENSOR_STREAM_CHANNEL_INTERFACE_HPP_
-#define _CAP_OB_SENSOR_STREAM_CHANNEL_INTERFACE_HPP_
+#ifndef _CAP_OBSENSOR_STREAM_CHANNEL_INTERFACE_HPP_
+#define _CAP_OBSENSOR_STREAM_CHANNEL_INTERFACE_HPP_
 
-#ifdef HAVE_OB_SENSOR
+#ifdef HAVE_OBSENSOR
 
-#include "../precomp.hpp"
+#include "../precomp.hpp" // #include "precomp.hpp : compile error on linux
 
 #include <functional>
 #include <vector>
@@ -16,9 +16,9 @@ namespace cv{
 namespace obsensor{
     typedef enum
     {
-        OB3D_STREAM_IR = 1,
-        OB3D_STREAM_RGB = 2,
-        OB3D_STREAM_DEPTH = 3,
+        OBSENSOR_STREAM_IR = 1,
+        OBSENSOR_STREAM_RGB = 2,
+        OBSENSOR_STREAM_DEPTH = 3,
     } StreamType;
 
     typedef enum
@@ -28,6 +28,13 @@ namespace obsensor{
         FRAME_FORMAT_MJPG = 5,
         FRAME_FORMAT_Y16 = 8,
     } FrameFormat;
+
+    typedef enum
+    {
+        DEPTH_TO_COLOR_ALIGN = 42,
+        CAMERA_PARAM = 1001,
+        EXT_PARAM = 1005,
+    }PropertyId;
 
     struct Frame
     {
@@ -47,15 +54,14 @@ namespace obsensor{
     };
 
     typedef std::function<void(Frame *)> FrameCallback;
-
     class IStreamChannel
     {
     public:
         virtual ~IStreamChannel() noexcept {}
         virtual void start(const StreamProfile &profile, FrameCallback frameCallback) = 0;
         virtual void stop() = 0;
-        virtual bool setProperty(int obPropId, const uint8_t *data, uint32_t dataSize) = 0;
-        virtual bool getProperty(int obPropId, uint8_t *outData, uint32_t outDataSize) = 0;
+        virtual bool setProperty(int propId, const uint8_t *data, uint32_t dataSize) = 0;
+        virtual bool getProperty(int propId, uint8_t *recvData, uint32_t recvDataSize) = 0;
 
         virtual StreamType streamType() const = 0;
     };
@@ -65,5 +71,5 @@ namespace obsensor{
 
 } // namespace obsensor
 } // namespace cv
-#endif // HAVE_OB_SENSOR
-#endif // _CAP_OB_SENSOR_STREAM_CHANNEL_INTERFACE_HPP_
+#endif // HAVE_OBSENSOR
+#endif // _CAP_OBSENSOR_STREAM_CHANNEL_INTERFACE_HPP_

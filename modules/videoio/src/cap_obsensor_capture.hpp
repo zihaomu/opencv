@@ -2,15 +2,15 @@
 // It is subject to the license terms in the LICENSE file found in the top-level directory
 // of this distribution and at http://opencv.org/license.html.
 
-#ifndef _CAP_OB_SENSOR_CAPTURE__HPP_
-#define _CAP_OB_SENSOR_CAPTURE__HPP_
+#ifndef _CAP_OBSENSOR_CAPTURE__HPP_
+#define _CAP_OBSENSOR_CAPTURE__HPP_
 
 #include <map>
 #include <mutex>
 
 #include "cap_obsensor/obsensor_stream_channel_interface.hpp"
 
-#ifdef HAVE_OB_SENSOR
+#ifdef HAVE_OBSENSOR
 namespace cv
 {
 class VideoCapture_obsensor : public IVideoCapture
@@ -30,7 +30,7 @@ public:
     virtual bool grabFrame() CV_OVERRIDE;
     virtual bool retrieveFrame(int outputType, OutputArray frame) CV_OVERRIDE;
     virtual int getCaptureDomain() CV_OVERRIDE{
-        return CAP_OB_SENSOR;
+        return CAP_OBSENSOR;
     }
     virtual bool isOpened() const CV_OVERRIDE{
         return isOpened_;
@@ -51,5 +51,5 @@ private:
     Mat grabbedRgbFrame_;
 };
 } // namespace cv
-#endif // HAVE_OB_SENSOR
-#endif // _CAP_OB_SENSOR_CAPTURE__HPP_
+#endif // HAVE_OBSENSOR
+#endif // _CAP_OBSENSOR_CAPTURE__HPP_

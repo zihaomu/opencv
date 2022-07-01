@@ -123,7 +123,7 @@ enum VideoCaptureAPIs {
        CAP_INTEL_MFX    = 2300,         //!< Intel MediaSDK
        CAP_XINE         = 2400,         //!< XINE engine (Linux)
        CAP_UEYE         = 2500,         //!< uEye Camera API
-       CAP_OB_SENSOR    = 2600,         //!< For Orbbec 3D-Sensor device/module (Astra+, Femto)
+       CAP_OBSENSOR     = 2600,         //!< For Orbbec 3D-Sensor device/module (Astra+, Femto)
      };
 
 /** @brief cv::VideoCapture generic properties identifier.
@@ -655,18 +655,18 @@ enum { CAP_PROP_IMAGES_BASE = 18000,
 
 //! @} Images
 
-/** @name OB3D (for Orbbec 3D camera)
+/** @name OBSENSOR (for Orbbec 3D-Sensor device/module )
     @{
 */
-//! OB3D data given from depth generator
+//! OBSENSOR data given from iamge generator
 enum
 {
-  CAP_OB_SENSOR_DEPTH_MAP = 0, //!< Depth values in mm (CV_16UC1)
-  CAP_OB_SENSOR_BGR_IMAGE = 1, //!< Data given from RGB image sensor
-  CAP_OB_SENSOR_IR_IMAGE = 2   //!< Data given from IR image sensor(CV_16UC1)
+  CAP_OBSENSOR_DEPTH_MAP = 0, //!< Depth values in mm (CV_16UC1)
+  CAP_OBSENSOR_BGR_IMAGE = 1, //!< Data given from BGR image sensor
+  CAP_OBSENSOR_IR_IMAGE = 2   //!< Data given from IR image sensor(CV_16UC1)
 };
 
-//! @} OB3D
+//! @} OBSENSOR
 
 //! @} videoio_flags_others
 

@@ -2,7 +2,7 @@
 // It is subject to the license terms in the LICENSE file found in the top-level directory
 // of this distribution and at http://opencv.org/license.html.
 
-#ifdef HAVE_OB_SENSOR_MSMF
+#ifdef HAVE_OBSENSOR_MSMF
 
 #include "obsensor_stream_channel_msmf.hpp"
 
@@ -194,7 +194,10 @@ namespace cv
 
         MSMFStreamChannel::MSMFStreamChannel(const UvcDeviceInfo &devInfo) : devInfo_(devInfo),
                                                                              streamType_(parseUvcDeviceNameToStreamType(devInfo_.name)),
-                                                                             mfContext_(MFContext::getInstance())
+                                                                             mfContext_(MFContext::getInstance()),
+                                                                             xuNodeId_(-1),
+                                                                             xuRecvBuf_(nullptr),
+                                                                             xuSendBuf_(nullptr)
         {
             HR_FAILED_RETURN(MFCreateAttributes(&deviceAttrs_, 2));
             HR_FAILED_RETURN(deviceAttrs_->SetGUID(MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE, MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_GUID));
@@ -215,6 +218,21 @@ namespace cv
             HR_FAILED_RETURN(readerAttrs_->SetUnknown(MF_SOURCE_READER_ASYNC_CALLBACK, static_cast<IUnknown *>(this)));
             HR_FAILED_RETURN(MFCreateSourceReaderFromMediaSource(deviceSource_.Get(), readerAttrs_.Get(), &streamReader_));
             HR_FAILED_RETURN(streamReader_->SetStreamSelection(static_cast<DWORD>(MF_SOURCE_READER_ALL_STREAMS), true));
+
+            HR_FAILED_RETURN(deviceSource_->QueryInterface(__uuidof(IKsTopologyInfo), reinterpret_cast<void **>(&xuKsTopologyInfo_)));
+            DWORD nNodes = 0;
+            HR_FAILED_RETURN(xuKsTopologyInfo_->get_NumNodes(&nNodes));
+            for(DWORD i = 0; i < nNodes; i++) {
+                GUID nodeType;
+                HR_FAILED_EXEC(xuKsTopologyInfo_->get_NodeType(i, &nodeType), { continue; })
+                if(nodeType == KSNODETYPE_DEV_SPECIFIC) {
+                    xuNodeId_ = i;
+                }
+            }
+            if(xuNodeId_!=-1){
+                HR_FAILED_RETURN(xuKsTopologyInfo_->CreateNodeInstance(xuNodeId_, IID_IUnknown, reinterpret_cast<LPVOID *>(&xuNodeInstance_)));
+                HR_FAILED_RETURN(xuNodeInstance_->QueryInterface(__uuidof(IKsControl), reinterpret_cast<void **>(&xuKsControl_)));
+            }
         }
 
         MSMFStreamChannel::~MSMFStreamChannel()
@@ -243,6 +261,21 @@ namespace cv
             if (deviceSource_)
             {
                 deviceSource_.Release();
+            }
+            if(xuKsTopologyInfo_){
+                xuKsTopologyInfo_.Release();
+            }
+            if(xuNodeInstance_){
+                xuNodeInstance_.Release();
+            }
+            if(xuKsControl_){
+                xuKsControl_.Release();
+            }
+            if(xuRecvBuf_!=nullptr){
+                delete[] xuRecvBuf_;
+            }
+            if(xuSendBuf_!=nullptr){
+                delete[] xuSendBuf_;
             }
         }
 
@@ -320,12 +353,30 @@ namespace cv
             }
         }
 
-        bool MSMFStreamChannel::setProperty(int obPropId, const uint8_t *data, uint32_t dataSize)
+        bool MSMFStreamChannel::setProperty(int propId, const uint8_t *data, uint32_t dataSize)
         {
-            return false;
+            uint8_t *rcvData;
+            uint32_t rcvLen;
+            bool rst = true;
+            switch (propId)
+            {
+            case DEPTH_TO_COLOR_ALIGN:
+                rst &= setXu(2, DEPTH_TO_COLOR_ALIGN_CMD0, sizeof(DEPTH_TO_COLOR_ALIGN_CMD0));
+                rst &= getXu(2, &rcvData, &rcvLen);
+                rst &= setXu(2, DEPTH_TO_COLOR_ALIGN_CMD1, sizeof(DEPTH_TO_COLOR_ALIGN_CMD1));
+                rst &= getXu(2, &rcvData, &rcvLen);
+                rst &= setXu(2, DEPTH_TO_COLOR_ALIGN_CMD2, sizeof(DEPTH_TO_COLOR_ALIGN_CMD2));
+                rst &= getXu(2, &rcvData, &rcvLen);
+                rst &= setXu(2, DEPTH_TO_COLOR_ALIGN_CMD3, sizeof(DEPTH_TO_COLOR_ALIGN_CMD3));
+                rst &= getXu(2, &rcvData, &rcvLen);
+                break;
+            default:
+                break;
+            }
+            return rst;
         }
 
-        bool MSMFStreamChannel::getProperty(int obPropId, uint8_t *outData, uint32_t outDataSize)
+        bool MSMFStreamChannel::getProperty(int propId, uint8_t *recvData, uint32_t recvDataSize)
         {
             return false;
         }
@@ -333,6 +384,63 @@ namespace cv
         StreamType MSMFStreamChannel::streamType() const
         {
             return streamType_;
+        }
+
+        
+        bool  MSMFStreamChannel::setXu(uint8_t ctrl, const uint8_t *data, uint32_t len){
+            if(xuSendBuf_==nullptr){
+                xuSendBuf_ = new uint8_t[XU_MAX_DATA_LENGTH];
+            }
+            memcpy(xuSendBuf_, data, len);
+            // switch (ctrl)
+            // {
+            // case 1:
+            //     len = 512;
+            //     break;
+            // case 2:
+            //     len = 64;
+            //     break;
+            // case 3:
+            //     len = 1024;
+            //     break;
+            // default:
+            //     break;
+            // }
+
+            KSP_NODE                              node;
+            memset(&node, 0, sizeof(KSP_NODE));
+            node.Property.Set = {0xA55751A1, 0xF3C5, 0x4A5E, {0x8D, 0x5A, 0x68, 0x54, 0xB8, 0xFA, 0x27, 0x16}};
+            node.Property.Id    = ctrl;
+            node.Property.Flags = KSPROPERTY_TYPE_SET | KSPROPERTY_TYPE_TOPOLOGY;
+            node.NodeId         = xuNodeId_;
+            
+            ULONG bytes_received = 0;
+            HR_FAILED_EXEC(xuKsControl_->KsProperty(reinterpret_cast<PKSPROPERTY>(&node), sizeof(KSP_NODE), (void *)xuSendBuf_, XU_MAX_DATA_LENGTH, &bytes_received), { 
+                return false;
+            });
+            return true;
+        }
+
+        bool  MSMFStreamChannel::getXu(uint8_t ctrl, uint8_t **data, uint32_t *len){
+            if(xuRecvBuf_==nullptr){
+                xuRecvBuf_ = new uint8_t[XU_MAX_DATA_LENGTH];
+            }
+            KSP_NODE node;
+            memset(&node, 0, sizeof(KSP_NODE));
+            node.Property.Set   = {0xA55751A1, 0xF3C5, 0x4A5E, {0x8D, 0x5A, 0x68, 0x54, 0xB8, 0xFA, 0x27, 0x16}};
+            node.Property.Id    = ctrl;
+            node.Property.Flags = KSPROPERTY_TYPE_GET | KSPROPERTY_TYPE_TOPOLOGY;
+            node.NodeId         = xuNodeId_;
+
+            ULONG bytes_received = 0;
+            HR_FAILED_EXEC(xuKsControl_->KsProperty(reinterpret_cast<PKSPROPERTY>(&node), sizeof(node), xuRecvBuf_, XU_MAX_DATA_LENGTH, &bytes_received), {
+                *len = 0;
+                data = nullptr;
+                return false;
+            });
+            *data = xuRecvBuf_;
+            *len    = bytes_received;
+            return true;
         }
 
         STDMETHODIMP MSMFStreamChannel::QueryInterface(REFIID iid, void **ppv)
@@ -413,4 +521,4 @@ namespace cv
         }
     } // namespace obsensor
 } // namespace cv
-#endif // HAVE_OB_SENSOR_MSMF
+#endif // HAVE_OBSENSOR_MSMF

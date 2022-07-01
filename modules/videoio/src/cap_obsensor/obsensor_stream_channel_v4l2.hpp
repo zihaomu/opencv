@@ -1,9 +1,9 @@
 // This file is part of OpenCV project.
 // It is subject to the license terms in the LICENSE file found in the top-level directory
 // of this distribution and at http://opencv.org/license.html.
-#ifndef _CAP_OB_SENSOR_STREAM_CHANNEL_V4L2_HPP_
-#define _CAP_OB_SENSOR_STREAM_CHANNEL_V4L2_HPP_
-#ifdef HAVE_OB_SENSOR_V4L2
+#ifndef _CAP_OBSENSOR_STREAM_CHANNEL_V4L2_HPP_
+#define _CAP_OBSENSOR_STREAM_CHANNEL_V4L2_HPP_
+#ifdef HAVE_OBSENSOR_V4L2
 
 #include "obsensor_uvc_stream_channel.hpp"
 
@@ -43,11 +43,11 @@ namespace obsensor{
 
         virtual void start(const StreamProfile &profile, FrameCallback frameCallback) override;
         virtual void stop() override;
-        virtual bool setProperty(int obPropId, const uint8_t *data, uint32_t dataSize) override
+        virtual bool setProperty(int propId, const uint8_t *data, uint32_t dataSize) override
         {
             return false; // todo
         }
-        virtual bool getProperty(int obPropId, uint8_t *outData, uint32_t outDataSize) override
+        virtual bool getProperty(int propId, uint8_t *recvData, uint32_t recvDataSize) override
         {
             return false; // todo
         }
@@ -76,5 +76,5 @@ namespace obsensor{
 
 } // namespace obsensor
 } // namespace cv
-#endif // HAVE_OB_SENSOR_V4L2
-#endif // _CAP_OB_SENSOR_STREAM_CHANNEL_V4L2_HPP_
+#endif // HAVE_OBSENSOR_V4L2
+#endif // _CAP_OBSENSOR_STREAM_CHANNEL_V4L2_HPP_
