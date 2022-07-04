@@ -392,20 +392,6 @@ namespace cv
                 xuSendBuf_ = new uint8_t[XU_MAX_DATA_LENGTH];
             }
             memcpy(xuSendBuf_, data, len);
-            // switch (ctrl)
-            // {
-            // case 1:
-            //     len = 512;
-            //     break;
-            // case 2:
-            //     len = 64;
-            //     break;
-            // case 3:
-            //     len = 1024;
-            //     break;
-            // default:
-            //     break;
-            // }
 
             KSP_NODE                              node;
             memset(&node, 0, sizeof(KSP_NODE));

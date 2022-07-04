@@ -14,6 +14,7 @@ namespace cv
 
 #define OBSENSOR_CAM_PID 0x2bc5 // usb pid
 #define XU_MAX_DATA_LENGTH 1024
+#define XU_UNIT_ID 4
 
         struct UvcDeviceInfo
         {
