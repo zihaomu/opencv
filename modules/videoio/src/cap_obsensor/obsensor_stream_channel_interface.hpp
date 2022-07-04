@@ -32,8 +32,6 @@ namespace obsensor{
     typedef enum
     {
         DEPTH_TO_COLOR_ALIGN = 42,
-        CAMERA_PARAM = 1001,
-        EXT_PARAM = 1005,
     }PropertyId;
 
     struct Frame
@@ -62,7 +60,7 @@ namespace obsensor{
         virtual void stop() = 0;
         virtual bool setProperty(int propId, const uint8_t *data, uint32_t dataSize) = 0;
         virtual bool getProperty(int propId, uint8_t *recvData, uint32_t recvDataSize) = 0;
-
+ 
         virtual StreamType streamType() const = 0;
     };
     

@@ -32,14 +32,14 @@ namespace obsensor{
         std::shared_ptr<IStreamChannel> createStreamChannel(const UvcDeviceInfo &devInfo);
 
     private:
-        V4L2Context(){};
+        V4L2Context() noexcept {}
     };
 
     class V4L2StreamChannel : public IStreamChannel
     {
     public:
         V4L2StreamChannel(const UvcDeviceInfo &devInfo);
-        virtual ~V4L2StreamChannel();
+        virtual ~V4L2StreamChannel() noexcept;
 
         virtual void start(const StreamProfile &profile, FrameCallback frameCallback) override;
         virtual void stop() override;
@@ -72,6 +72,7 @@ namespace obsensor{
 
         uint8_t *xuRecvBuf_;
         uint8_t *xuSendBuf_;
+        std::shared_ptr<DepthFrameProcessor> depthFrameProcessor_;
     };
 
 } // namespace obsensor

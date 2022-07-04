@@ -167,9 +167,18 @@ namespace obsensor{
         {
             CV_LOG_ERROR(NULL, "Open " << devInfo_.id << " failed ! errno=" << errno)
         }
+        else{
+            if(streamType_==OBSENSOR_STREAM_DEPTH && setXu(2, DEPTH_TO_COLOR_ALIGN_CMD4, sizeof(DEPTH_TO_COLOR_ALIGN_CMD4))){
+                uint8_t *rcvData;
+                uint32_t rcvLen;
+                if(getXu(1, &rcvData, &rcvLen) && rcvData[8]==0&&rcvData[8]==0){
+                    depthFrameProcessor_ = std::make_shared<DepthFrameProcessor>(*(OBExtensionParam*)(rcvData+10));
+                }
+            }
+        }
     }
 
-    V4L2StreamChannel::~V4L2StreamChannel()
+    V4L2StreamChannel::~V4L2StreamChannel() noexcept
     {
         stop();
         if (devFd_)
@@ -309,6 +318,9 @@ namespace obsensor{
                 streamStateCv_.notify_all();
             }
             Frame fo = {currentProfile_.format, currentProfile_.width, currentProfile_.height, buf.length, frameBuffList[buf.index].ptr};
+            if(depthFrameProcessor_){
+                depthFrameProcessor_->process(&fo);
+            }
             frameCallback_(&fo);
             IOCTL_FAILED_CONTINUE(xioctl(devFd_, VIDIOC_QBUF, &buf));
         }

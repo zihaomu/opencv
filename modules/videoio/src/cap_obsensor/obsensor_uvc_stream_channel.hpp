@@ -42,9 +42,26 @@ namespace cv
         extern const uint8_t DEPTH_TO_COLOR_ALIGN_CMD1[16];
         extern const uint8_t DEPTH_TO_COLOR_ALIGN_CMD2[16];
         extern const uint8_t DEPTH_TO_COLOR_ALIGN_CMD3[16];
-        // class UvcStreamChannelContext{
-        // }
+        extern const uint8_t DEPTH_TO_COLOR_ALIGN_CMD4[16]; // disp param
+        
+        struct OBExtensionParam{
+            float bl; 
+            float bl2;
+            float pd; 
+            float ps; 
+        };
 
+        class DepthFrameProcessor{
+        public:
+            DepthFrameProcessor(const OBExtensionParam &parma);
+            ~DepthFrameProcessor() noexcept;
+            void process(Frame *frame);
+
+
+        private:
+            const OBExtensionParam param_;
+            uint16_t *lookUpTable_;
+        };
     } // namespace obsensor
 } // namespace cv
 #endif // HAVE_OBSENSOR

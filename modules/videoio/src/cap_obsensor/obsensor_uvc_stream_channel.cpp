@@ -23,6 +23,7 @@ namespace cv
     const uint8_t DEPTH_TO_COLOR_ALIGN_CMD1[16] = {0x47, 0x4d, 0x04, 0x00, 0x02, 0x00, 0x54, 0x00, 0x3f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
     const uint8_t DEPTH_TO_COLOR_ALIGN_CMD2[16] = {0x47, 0x4d, 0x04, 0x00, 0x02, 0x00, 0x56, 0x00, 0x0d, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00};
     const uint8_t DEPTH_TO_COLOR_ALIGN_CMD3[16] = {0x47, 0x4d, 0x04, 0x00, 0x02, 0x00, 0x58, 0x00, 0x2a, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00};
+    const uint8_t DEPTH_TO_COLOR_ALIGN_CMD4[16] = {0x47, 0x4d, 0x02, 0x00, 0x03, 0x00, 0x60, 0x00, 0xed, 0x03, 0x00, 0x00};
 
 #if defined(HAVE_OBSENSOR_V4L2)
 #define fourCc2Int(a, b, c, d) \
@@ -130,6 +131,35 @@ namespace cv
                 CV_LOG_ERROR(NULL, "Camera index out of range");
             }
             return streamChannelGroup;
+        }
+
+
+        DepthFrameProcessor::DepthFrameProcessor(const OBExtensionParam& param): param_(param){
+            double tempValue = 0;
+            double rstValue     = 0;
+            lookUpTable_ = new uint16_t[4096];
+            memset(lookUpTable_, 0, 4096 * 2);
+            for(uint16_t oriValue = 0; oriValue < 4096; oriValue++) {
+                if(oriValue == 0) {
+                    continue;
+                }
+                tempValue = 200.375 - (double)oriValue/8;
+                rstValue = (double)param_.pd / (1 + tempValue * param_.ps / param_.bl)*10;
+                if((rstValue >= 40) && (rstValue <= 10000) && rstValue < 65536) {
+                    lookUpTable_[oriValue] = (uint16_t)rstValue;
+                }
+            }
+        }
+
+        DepthFrameProcessor::~DepthFrameProcessor(){
+            delete[] lookUpTable_; 
+        }
+
+        void DepthFrameProcessor::process(Frame *frame){
+            uint16_t *data = (uint16_t *)frame->data;
+            for(uint32_t i=0; i< frame->dataSize/2; i++){
+                data[i] = lookUpTable_[data[i] & 0x0fff];
+            }
         }
     } // namespace obsensor
 } // namespace cv

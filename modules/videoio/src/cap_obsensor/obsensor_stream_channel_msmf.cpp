@@ -233,6 +233,14 @@ namespace cv
                 HR_FAILED_RETURN(xuKsTopologyInfo_->CreateNodeInstance(xuNodeId_, IID_IUnknown, reinterpret_cast<LPVOID *>(&xuNodeInstance_)));
                 HR_FAILED_RETURN(xuNodeInstance_->QueryInterface(__uuidof(IKsControl), reinterpret_cast<void **>(&xuKsControl_)));
             }
+
+            if(streamType_==OBSENSOR_STREAM_DEPTH && setXu(2, DEPTH_TO_COLOR_ALIGN_CMD4, sizeof(DEPTH_TO_COLOR_ALIGN_CMD4))){
+                uint8_t *rcvData;
+                uint32_t rcvLen;
+                if(getXu(1, &rcvData, &rcvLen) && rcvData[8]==0&&rcvData[8]==0){
+                    depthFrameProcessor_ = std::make_shared<DepthFrameProcessor>(*(OBExtensionParam*)(rcvData+10));
+                }
+            }
         }
 
         MSMFStreamChannel::~MSMFStreamChannel()
@@ -482,6 +490,9 @@ namespace cv
 
                     buffer->Lock(&byte_buffer, &max_length, &current_length);
                     Frame fo = {currentProfile_.format, currentProfile_.width, currentProfile_.height, current_length, (uint8_t *)byte_buffer};
+                    if(depthFrameProcessor_){
+                        depthFrameProcessor_->process(&fo);
+                    }
                     frameCallback_(&fo);
                     buffer->Unlock();
                 }
