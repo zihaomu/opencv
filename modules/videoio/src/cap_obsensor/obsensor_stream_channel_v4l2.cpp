@@ -12,6 +12,7 @@
 #include <sys/mman.h>
 #include <linux/videodev2.h>
 #include <linux/uvcvideo.h>
+#include <linux/usb/video.h>
 #include <fstream>
 #include <map>
 #include <vector>
@@ -341,7 +342,7 @@ namespace obsensor{
             {
                 .unit = XU_UNIT_ID,
                 .selector = ctrl,
-                .query = UVC_CTRL_FLAG_SET_CUR,
+                .query = UVC_SET_CUR,
                 .size = ctrl == 1 ? 512 : (ctrl == 2 ? 64 : 1024),
                 .data = xuSendBuf_};
         if (devFd_ > 0)
@@ -361,7 +362,7 @@ namespace obsensor{
             {
                 .unit = XU_UNIT_ID,
                 .selector = ctrl,
-                .query = UVC_CTRL_FLAG_GET_CUR,
+                .query = UVC_GET_CUR,
                 .size = ctrl == 1 ? 512 : (ctrl == 2 ? 64 : 1024),
                 .data = xuRecvBuf_};
 
