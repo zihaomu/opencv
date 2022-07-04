@@ -161,6 +161,55 @@ namespace cv
                 data[i] = lookUpTable_[data[i] & 0x0fff];
             }
         }
+        
+        IUvcStreamChannel::IUvcStreamChannel(const UvcDeviceInfo &devInfo): 
+            devInfo_(devInfo),
+            streamType_(parseUvcDeviceNameToStreamType(devInfo_.name))
+        {
+
+        }
+
+        StreamType IUvcStreamChannel::streamType() const{
+            return streamType_;
+        }
+
+        bool IUvcStreamChannel::setProperty(int propId, const uint8_t *data, uint32_t dataSize){
+            uint8_t *rcvData;
+            uint32_t rcvLen;
+            bool rst = true;
+            switch (propId)
+            {
+            case DEPTH_TO_COLOR_ALIGN:
+                rst &= setXu(2, DEPTH_TO_COLOR_ALIGN_CMD0, sizeof(DEPTH_TO_COLOR_ALIGN_CMD0));
+                rst &= getXu(2, &rcvData, &rcvLen);
+                rst &= setXu(2, DEPTH_TO_COLOR_ALIGN_CMD1, sizeof(DEPTH_TO_COLOR_ALIGN_CMD1));
+                rst &= getXu(2, &rcvData, &rcvLen);
+                rst &= setXu(2, DEPTH_TO_COLOR_ALIGN_CMD2, sizeof(DEPTH_TO_COLOR_ALIGN_CMD2));
+                rst &= getXu(2, &rcvData, &rcvLen);
+                rst &= setXu(2, DEPTH_TO_COLOR_ALIGN_CMD3, sizeof(DEPTH_TO_COLOR_ALIGN_CMD3));
+                rst &= getXu(2, &rcvData, &rcvLen);
+                break;
+            default:
+                break;
+            }
+            return rst;
+        }
+
+        bool IUvcStreamChannel::getProperty(int propId, uint8_t *recvData, uint32_t recvDataSize){
+            return false;
+        }    
+        
+        bool IUvcStreamChannel::initDepthFrameProcessor(){
+            if(streamType_==OBSENSOR_STREAM_DEPTH && setXu(2, DEPTH_TO_COLOR_ALIGN_CMD4, sizeof(DEPTH_TO_COLOR_ALIGN_CMD4))){
+                uint8_t *rcvData;
+                uint32_t rcvLen;
+                if(getXu(1, &rcvData, &rcvLen) && rcvData[8]==0&&rcvData[8]==0){
+                    depthFrameProcessor_ = std::make_shared<DepthFrameProcessor>(*(OBExtensionParam*)(rcvData+10));
+                    return true;
+                }
+            }
+            return false;
+        }
     } // namespace obsensor
 } // namespace cv
 #endif // HAVE_OBSENSOR_V4L2 || HAVE_OBSENSOR_MSMF

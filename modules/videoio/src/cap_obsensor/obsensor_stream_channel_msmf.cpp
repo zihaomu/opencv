@@ -192,8 +192,8 @@ namespace cv
             CV_Assert(SUCCEEDED(MFStartup(MF_VERSION)));
         }
 
-        MSMFStreamChannel::MSMFStreamChannel(const UvcDeviceInfo &devInfo) : devInfo_(devInfo),
-                                                                             streamType_(parseUvcDeviceNameToStreamType(devInfo_.name)),
+        MSMFStreamChannel::MSMFStreamChannel(const UvcDeviceInfo &devInfo) : 
+                                                                             IUvcStreamChannel(devInfo),
                                                                              mfContext_(MFContext::getInstance()),
                                                                              xuNodeId_(-1),
                                                                              xuRecvBuf_(nullptr),
@@ -234,12 +234,8 @@ namespace cv
                 HR_FAILED_RETURN(xuNodeInstance_->QueryInterface(__uuidof(IKsControl), reinterpret_cast<void **>(&xuKsControl_)));
             }
 
-            if(streamType_==OBSENSOR_STREAM_DEPTH && setXu(2, DEPTH_TO_COLOR_ALIGN_CMD4, sizeof(DEPTH_TO_COLOR_ALIGN_CMD4))){
-                uint8_t *rcvData;
-                uint32_t rcvLen;
-                if(getXu(1, &rcvData, &rcvLen) && rcvData[8]==0&&rcvData[8]==0){
-                    depthFrameProcessor_ = std::make_shared<DepthFrameProcessor>(*(OBExtensionParam*)(rcvData+10));
-                }
+            if(streamType_==OBSENSOR_STREAM_DEPTH){
+                initDepthFrameProcessor();
             }
         }
 
@@ -360,40 +356,6 @@ namespace cv
                                         { return streamState_ == STREAM_STOPED; });
             }
         }
-
-        bool MSMFStreamChannel::setProperty(int propId, const uint8_t *data, uint32_t dataSize)
-        {
-            uint8_t *rcvData;
-            uint32_t rcvLen;
-            bool rst = true;
-            switch (propId)
-            {
-            case DEPTH_TO_COLOR_ALIGN:
-                rst &= setXu(2, DEPTH_TO_COLOR_ALIGN_CMD0, sizeof(DEPTH_TO_COLOR_ALIGN_CMD0));
-                rst &= getXu(2, &rcvData, &rcvLen);
-                rst &= setXu(2, DEPTH_TO_COLOR_ALIGN_CMD1, sizeof(DEPTH_TO_COLOR_ALIGN_CMD1));
-                rst &= getXu(2, &rcvData, &rcvLen);
-                rst &= setXu(2, DEPTH_TO_COLOR_ALIGN_CMD2, sizeof(DEPTH_TO_COLOR_ALIGN_CMD2));
-                rst &= getXu(2, &rcvData, &rcvLen);
-                rst &= setXu(2, DEPTH_TO_COLOR_ALIGN_CMD3, sizeof(DEPTH_TO_COLOR_ALIGN_CMD3));
-                rst &= getXu(2, &rcvData, &rcvLen);
-                break;
-            default:
-                break;
-            }
-            return rst;
-        }
-
-        bool MSMFStreamChannel::getProperty(int propId, uint8_t *recvData, uint32_t recvDataSize)
-        {
-            return false;
-        }
-
-        StreamType MSMFStreamChannel::streamType() const
-        {
-            return streamType_;
-        }
-
         
         bool  MSMFStreamChannel::setXu(uint8_t ctrl, const uint8_t *data, uint32_t len){
             if(xuSendBuf_==nullptr){

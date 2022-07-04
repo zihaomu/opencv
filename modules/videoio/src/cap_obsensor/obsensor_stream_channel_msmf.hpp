@@ -110,7 +110,7 @@ namespace obsensor{
         unsigned int numerator;
     } FrameRate;
 
-    class MSMFStreamChannel : public IStreamChannel, public IMFSourceReaderCallback
+    class MSMFStreamChannel : public IUvcStreamChannel, public IMFSourceReaderCallback
     {
     public:
         MSMFStreamChannel(const UvcDeviceInfo &devInfo);
@@ -118,19 +118,13 @@ namespace obsensor{
 
         virtual void start(const StreamProfile &profile, FrameCallback frameCallback) override;
         virtual void stop() override;
-        virtual bool setProperty(int propId, const uint8_t *data, uint32_t dataSize) override;
-        virtual bool getProperty(int propId, uint8_t *recvData, uint32_t recvDataSize) override;
-
-        virtual StreamType streamType() const override;
 
     private:
-        bool setXu(uint8_t ctrl, const uint8_t *data, uint32_t len);
-        bool getXu(uint8_t ctrl, uint8_t **data, uint32_t *len);
+        virtual bool setXu(uint8_t ctrl, const uint8_t *data, uint32_t len) override;
+        virtual bool getXu(uint8_t ctrl, uint8_t **data, uint32_t *len) override;
 
     private:
         MFContext &mfContext_;
-        const UvcDeviceInfo devInfo_;
-        StreamType streamType_;
 
         ComPtr<IMFAttributes> deviceAttrs_ = nullptr;
         ComPtr<IMFMediaSource> deviceSource_ = nullptr;
@@ -153,8 +147,6 @@ namespace obsensor{
 
         uint8_t *xuRecvBuf_;
         uint8_t *xuSendBuf_;
-
-        std::shared_ptr<DepthFrameProcessor> depthFrameProcessor_;
 
     public:
         STDMETHODIMP QueryInterface(REFIID iid, void **ppv) override;

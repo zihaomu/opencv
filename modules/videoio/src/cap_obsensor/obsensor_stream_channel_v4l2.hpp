@@ -35,7 +35,7 @@ namespace obsensor{
         V4L2Context() noexcept {}
     };
 
-    class V4L2StreamChannel : public IStreamChannel
+    class V4L2StreamChannel : public IUvcStreamChannel
     {
     public:
         V4L2StreamChannel(const UvcDeviceInfo &devInfo);
@@ -43,20 +43,14 @@ namespace obsensor{
 
         virtual void start(const StreamProfile &profile, FrameCallback frameCallback) override;
         virtual void stop() override;
-        virtual bool setProperty(int propId, const uint8_t *data, uint32_t dataSize) override;
-        virtual bool getProperty(int propId, uint8_t *recvData, uint32_t recvDataSize) override;
-
-        virtual StreamType streamType() const override;
 
     private:
         void grabFrame();
 
-        bool setXu(uint8_t ctrl, const uint8_t *data, uint32_t len);
-        bool getXu(uint8_t ctrl, uint8_t **data, uint32_t *len);
+        virtual bool setXu(uint8_t ctrl, const uint8_t *data, uint32_t len) override;
+        virtual bool getXu(uint8_t ctrl, uint8_t **data, uint32_t *len) override;
 
     private:
-        const UvcDeviceInfo devInfo_;
-        StreamType streamType_;
         int devFd_;
 
         V4L2FrameBuffer frameBuffList[MAX_FRAME_BUFFER_NUM];

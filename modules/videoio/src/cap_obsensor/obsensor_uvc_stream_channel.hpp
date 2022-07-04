@@ -34,15 +34,8 @@ namespace cv
             STREAM_STOPPING = 3,
         } StreamState;
 
-        StreamType parseUvcDeviceNameToStreamType(const std::string &devName);
         FrameFormat frameFourccToFormat(uint32_t fourcc);
         uint32_t frameFormatToFourcc(FrameFormat);
-
-        extern const uint8_t DEPTH_TO_COLOR_ALIGN_CMD0[16];
-        extern const uint8_t DEPTH_TO_COLOR_ALIGN_CMD1[16];
-        extern const uint8_t DEPTH_TO_COLOR_ALIGN_CMD2[16];
-        extern const uint8_t DEPTH_TO_COLOR_ALIGN_CMD3[16];
-        extern const uint8_t DEPTH_TO_COLOR_ALIGN_CMD4[16]; // disp param
         
         struct OBExtensionParam{
             float bl; 
@@ -57,10 +50,30 @@ namespace cv
             ~DepthFrameProcessor() noexcept;
             void process(Frame *frame);
 
-
         private:
             const OBExtensionParam param_;
             uint16_t *lookUpTable_;
+        };
+
+        class IUvcStreamChannel: public IStreamChannel{
+            public:
+                IUvcStreamChannel(const UvcDeviceInfo &devInfo);
+                virtual ~IUvcStreamChannel() noexcept {}
+
+                virtual bool setProperty(int propId, const uint8_t *data, uint32_t dataSize) override;
+                virtual bool getProperty(int propId, uint8_t *recvData, uint32_t recvDataSize) override;
+                virtual StreamType streamType() const override;
+
+            protected:
+                virtual bool setXu(uint8_t ctrl, const uint8_t *data, uint32_t len) = 0;
+                virtual bool getXu(uint8_t ctrl, uint8_t **data, uint32_t *len) = 0;
+
+                bool initDepthFrameProcessor();
+
+            protected:
+                const UvcDeviceInfo devInfo_;
+                StreamType streamType_;
+                std::shared_ptr<DepthFrameProcessor> depthFrameProcessor_;
         };
     } // namespace obsensor
 } // namespace cv

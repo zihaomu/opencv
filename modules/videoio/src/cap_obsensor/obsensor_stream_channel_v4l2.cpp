@@ -155,8 +155,8 @@ namespace obsensor{
         return std::make_shared<V4L2StreamChannel>(devInfo);
     }
 
-    V4L2StreamChannel::V4L2StreamChannel(const UvcDeviceInfo &devInfo) : devInfo_(devInfo),
-                                                                         streamType_(parseUvcDeviceNameToStreamType(devInfo_.name)),
+    V4L2StreamChannel::V4L2StreamChannel(const UvcDeviceInfo &devInfo) : 
+                                                                         IUvcStreamChannel(devInfo),
                                                                          devFd_(-1),
                                                                          streamState_(STREAM_STOPED),
                                                                          xuRecvBuf_(nullptr),
@@ -168,15 +168,10 @@ namespace obsensor{
         {
             CV_LOG_ERROR(NULL, "Open " << devInfo_.id << " failed ! errno=" << errno)
         }
-        else{
-            if(streamType_==OBSENSOR_STREAM_DEPTH && setXu(2, DEPTH_TO_COLOR_ALIGN_CMD4, sizeof(DEPTH_TO_COLOR_ALIGN_CMD4))){
-                uint8_t *rcvData;
-                uint32_t rcvLen;
-                if(getXu(1, &rcvData, &rcvLen) && rcvData[8]==0&&rcvData[8]==0){
-                    depthFrameProcessor_ = std::make_shared<DepthFrameProcessor>(*(OBExtensionParam*)(rcvData+10));
-                }
-            }
+        else if(streamType_==OBSENSOR_STREAM_DEPTH){
+            initDepthFrameProcessor();
         }
+        
     }
 
     V4L2StreamChannel::~V4L2StreamChannel() noexcept
@@ -257,34 +252,6 @@ namespace obsensor{
             return;
         });
         grabFrameThread_ = std::thread(&V4L2StreamChannel::grabFrame, this);
-    }
-
-    bool V4L2StreamChannel::setProperty(int propId, const uint8_t *data, uint32_t dataSize)
-    {
-        uint8_t *rcvData;
-        uint32_t rcvLen;
-        bool rst = true;
-        switch (propId)
-        {
-        case DEPTH_TO_COLOR_ALIGN:
-            rst &= setXu(2, DEPTH_TO_COLOR_ALIGN_CMD0, sizeof(DEPTH_TO_COLOR_ALIGN_CMD0));
-            rst &= getXu(2, &rcvData, &rcvLen);
-            rst &= setXu(2, DEPTH_TO_COLOR_ALIGN_CMD1, sizeof(DEPTH_TO_COLOR_ALIGN_CMD1));
-            rst &= getXu(2, &rcvData, &rcvLen);
-            rst &= setXu(2, DEPTH_TO_COLOR_ALIGN_CMD2, sizeof(DEPTH_TO_COLOR_ALIGN_CMD2));
-            rst &= getXu(2, &rcvData, &rcvLen);
-            rst &= setXu(2, DEPTH_TO_COLOR_ALIGN_CMD3, sizeof(DEPTH_TO_COLOR_ALIGN_CMD3));
-            rst &= getXu(2, &rcvData, &rcvLen);
-            break;
-        default:
-            break;
-        }
-        return rst;
-    }
-
-    bool V4L2StreamChannel::getProperty(int propId, uint8_t *recvData, uint32_t recvDataSize)
-    {
-        return false; // todo
     }
 
     void V4L2StreamChannel::grabFrame()
@@ -401,12 +368,6 @@ namespace obsensor{
             }
         }
     }
-
-    StreamType V4L2StreamChannel::streamType() const
-    {
-        return streamType_;
-    }
-
 } // namespace obsensor
 } // namespace cv
 #endif // HAVE_OBSENSOR_V4L2
