@@ -19,11 +19,12 @@ namespace cv
 {
     namespace obsensor
     {
-    const uint8_t DEPTH_TO_COLOR_ALIGN_CMD0[16] = {0x47, 0x4d, 0x04, 0x00, 0x02, 0x00, 0x52, 0x00, 0x5B, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00};
-    const uint8_t DEPTH_TO_COLOR_ALIGN_CMD1[16] = {0x47, 0x4d, 0x04, 0x00, 0x02, 0x00, 0x54, 0x00, 0x3f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-    const uint8_t DEPTH_TO_COLOR_ALIGN_CMD2[16] = {0x47, 0x4d, 0x04, 0x00, 0x02, 0x00, 0x56, 0x00, 0x0d, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00};
-    const uint8_t DEPTH_TO_COLOR_ALIGN_CMD3[16] = {0x47, 0x4d, 0x04, 0x00, 0x02, 0x00, 0x58, 0x00, 0x2a, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00};
-    const uint8_t DEPTH_TO_COLOR_ALIGN_CMD4[16] = {0x47, 0x4d, 0x02, 0x00, 0x03, 0x00, 0x60, 0x00, 0xed, 0x03, 0x00, 0x00};
+    const uint8_t OB_EXT_CMD0[16] = {0x47, 0x4d, 0x04, 0x00, 0x02, 0x00, 0x52, 0x00, 0x5B, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00};
+    const uint8_t OB_EXT_CMD1[16] = {0x47, 0x4d, 0x04, 0x00, 0x02, 0x00, 0x54, 0x00, 0x3f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+    const uint8_t OB_EXT_CMD2[16] = {0x47, 0x4d, 0x04, 0x00, 0x02, 0x00, 0x56, 0x00, 0x0d, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00};
+    const uint8_t OB_EXT_CMD3[16] = {0x47, 0x4d, 0x04, 0x00, 0x02, 0x00, 0x58, 0x00, 0x2a, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00};
+    const uint8_t OB_EXT_CMD4[16] = {0x47, 0x4d, 0x02, 0x00, 0x03, 0x00, 0x60, 0x00, 0xed, 0x03, 0x00, 0x00};
+    const uint8_t OB_EXT_CMD5[16] = {0x47, 0x4d, 0x02, 0x00, 0x03, 0x00, 0x62, 0x00, 0xe9, 0x03, 0x00, 0x00};
 
 #if defined(HAVE_OBSENSOR_V4L2)
 #define fourCc2Int(a, b, c, d) \
@@ -180,30 +181,50 @@ namespace cv
             switch (propId)
             {
             case DEPTH_TO_COLOR_ALIGN:
-                rst &= setXu(2, DEPTH_TO_COLOR_ALIGN_CMD0, sizeof(DEPTH_TO_COLOR_ALIGN_CMD0));
+                // todo: value filling
+                rst &= setXu(2, OB_EXT_CMD0, sizeof(OB_EXT_CMD0));
                 rst &= getXu(2, &rcvData, &rcvLen);
-                rst &= setXu(2, DEPTH_TO_COLOR_ALIGN_CMD1, sizeof(DEPTH_TO_COLOR_ALIGN_CMD1));
+                rst &= setXu(2, OB_EXT_CMD1, sizeof(OB_EXT_CMD1));
                 rst &= getXu(2, &rcvData, &rcvLen);
-                rst &= setXu(2, DEPTH_TO_COLOR_ALIGN_CMD2, sizeof(DEPTH_TO_COLOR_ALIGN_CMD2));
+                rst &= setXu(2, OB_EXT_CMD2, sizeof(OB_EXT_CMD2));
                 rst &= getXu(2, &rcvData, &rcvLen);
-                rst &= setXu(2, DEPTH_TO_COLOR_ALIGN_CMD3, sizeof(DEPTH_TO_COLOR_ALIGN_CMD3));
+                rst &= setXu(2, OB_EXT_CMD3, sizeof(OB_EXT_CMD3));
                 rst &= getXu(2, &rcvData, &rcvLen);
                 break;
             default:
+                rst = false;
                 break;
             }
             return rst;
         }
 
-        bool IUvcStreamChannel::getProperty(int propId, uint8_t *recvData, uint32_t recvDataSize){
-            return false;
+        bool IUvcStreamChannel::getProperty(int propId, uint8_t *recvData, uint32_t *recvDataSize){
+            bool rst = true;
+            uint8_t *rcvData;
+            uint32_t rcvLen;
+            switch (propId)
+            {
+            case CAMERA_PARAM:
+                rst &= setXu(2, OB_EXT_CMD5, sizeof(OB_EXT_CMD5));
+                rst &= getXu(2, &rcvData, &rcvLen);
+                if(rst && OB_EXT_CMD5[6] == rcvData[6] && rcvData[8]==0 && rcvData[8]==0){
+                    memcpy(recvData, rcvData + 10, rcvLen - 10);
+                    *recvDataSize = rcvLen - 10;
+                }
+                break;
+            default:
+                rst = false;
+                break;
+            }
+
+            return rst;
         }    
         
         bool IUvcStreamChannel::initDepthFrameProcessor(){
-            if(streamType_==OBSENSOR_STREAM_DEPTH && setXu(2, DEPTH_TO_COLOR_ALIGN_CMD4, sizeof(DEPTH_TO_COLOR_ALIGN_CMD4))){
+            if(streamType_==OBSENSOR_STREAM_DEPTH && setXu(2, OB_EXT_CMD4, sizeof(OB_EXT_CMD4))){
                 uint8_t *rcvData;
                 uint32_t rcvLen;
-                if(getXu(1, &rcvData, &rcvLen) && rcvData[8]==0&&rcvData[8]==0){
+                if(getXu(1, &rcvData, &rcvLen) && OB_EXT_CMD4[6] == rcvData[6] && rcvData[8]==0&&rcvData[9]==0){
                     depthFrameProcessor_ = std::make_shared<DepthFrameProcessor>(*(OBExtensionParam*)(rcvData+10));
                     return true;
                 }

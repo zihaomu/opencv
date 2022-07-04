@@ -1,18 +1,23 @@
 #include <opencv2/videoio.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+#include <iostream>
 
 using namespace cv;
 int main(int argc, char *argv[])
 {
     VideoCapture obsensorCapture(0, CAP_OBSENSOR);
-
+    double fx = obsensorCapture.get(CAP_PROP_OBSENSOR_INTRINSIC_FX);
+    double fy = obsensorCapture.get(CAP_PROP_OBSENSOR_INTRINSIC_FY);
+    double cx = obsensorCapture.get(CAP_PROP_OBSENSOR_INTRINSIC_CX);
+    double cy = obsensorCapture.get(CAP_PROP_OBSENSOR_INTRINSIC_CY);
+    std::cout << "obsensor camera intrinsic params: fx=" << fx << ", fy=" << fy << ", cx=" << cx << ", cy=" << cy << std::endl;
+   
     Mat image;
     Mat depthMap;
     Mat adjDepthMap;
     Mat irImage;
     Mat adjIrImage;
-
     while (true)
     {
         // obsensorCapture >> depthMap;
@@ -22,6 +27,7 @@ int main(int argc, char *argv[])
         //     applyColorMap(adjDepthMap, adjDepthMap, COLORMAP_JET);
         //     imshow("DEPTH", adjDepthMap);
         // }
+
         if(obsensorCapture.grab()){
             if (obsensorCapture.retrieve(image, CAP_OBSENSOR_BGR_IMAGE))
             {

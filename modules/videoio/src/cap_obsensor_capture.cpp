@@ -40,6 +40,9 @@ namespace cv
                                    { 
                         std::unique_lock<std::mutex> lk(frameMutex_);
                         depthFrame_ =  Mat(frame->height, frame->width, CV_16UC1, frame->data, frame->width*2).clone(); });
+                    uint32_t len;
+                    memset(&camParam_, 0, sizeof(camParam_));
+                    channel->getProperty(obsensor::CAMERA_PARAM, (uint8_t*)&camParam_, &len);
                     break;
                 case obsensor::OBSENSOR_STREAM_IR:
                     channel->start(irProfile, [&](obsensor::Frame *frame)
@@ -108,6 +111,32 @@ namespace cv
             break;
         }
 
+        return false;
+    }
+
+    double VideoCapture_obsensor::getProperty(int propIdx) const{
+        double rst = 0.0;
+        propIdx = propIdx & (~CAP_OBSENSOR_GENERATORS_MASK);
+        // int gen = propIdx & CAP_OBSENSOR_GENERATORS_MASK;
+        switch(propIdx){
+        case CAP_PROP_OBSENSOR_INTRINSIC_FX:
+            rst = camParam_.p1[0] / (int)(camParam_.p1[2] * 2 / 640+0.5);
+            break;
+        case CAP_PROP_OBSENSOR_INTRINSIC_FY:
+            rst = camParam_.p1[1] / (int)(camParam_.p1[2] * 2 / 640+0.5);
+            break;
+        case CAP_PROP_OBSENSOR_INTRINSIC_CX:
+            rst = camParam_.p1[2] / (int)(camParam_.p1[2] * 2 / 640+0.5);
+            break;
+        case CAP_PROP_OBSENSOR_INTRINSIC_CY:
+            rst = camParam_.p1[3] / (int)(camParam_.p1[2] * 2 / 640+0.5);
+            break;
+        }
+        return rst;
+    }
+
+    bool VideoCapture_obsensor::setProperty(int propIdx, double propVal){
+        CV_LOG_WARNING(NULL, "Unsupported or read only property, id=" << propIdx);
         return false;
     }
 

@@ -19,14 +19,8 @@ public:
     VideoCapture_obsensor(int index);
     virtual ~VideoCapture_obsensor(){};
 
-    virtual double getProperty(int propIdx) const CV_OVERRIDE{
-        // todo
-        return 0.0;
-    }
-    virtual bool setProperty(int propIdx, double propVal) CV_OVERRIDE{
-        // todo
-        return false;
-    }
+    virtual double getProperty(int propIdx) const CV_OVERRIDE;
+    virtual bool setProperty(int propIdx, double propVal) CV_OVERRIDE;
     virtual bool grabFrame() CV_OVERRIDE;
     virtual bool retrieveFrame(int outputType, OutputArray frame) CV_OVERRIDE;
     virtual int getCaptureDomain() CV_OVERRIDE{
@@ -49,6 +43,8 @@ private:
     Mat grabbedDepthFrame_;
     Mat grabbedIrFrame_;
     Mat grabbedRgbFrame_;
+
+    obsensor::CameraParam camParam_;
 };
 } // namespace cv
 #endif // HAVE_OBSENSOR

@@ -32,6 +32,7 @@ namespace obsensor{
     typedef enum
     {
         DEPTH_TO_COLOR_ALIGN = 42,
+        CAMERA_PARAM = 1001,
     }PropertyId;
 
     struct Frame
@@ -51,6 +52,17 @@ namespace obsensor{
         FrameFormat format;
     };
 
+    typedef struct {
+        float    p0[4];    
+        float    p1[4];    
+        float    p2[9];       
+        float    p3[3];       
+        float    p4[5];         
+        float    p5[5];         
+        uint32_t p6[2];  
+        uint32_t p7[2];  
+    }CameraParam;
+
     typedef std::function<void(Frame *)> FrameCallback;
     class IStreamChannel
     {
@@ -59,7 +71,7 @@ namespace obsensor{
         virtual void start(const StreamProfile &profile, FrameCallback frameCallback) = 0;
         virtual void stop() = 0;
         virtual bool setProperty(int propId, const uint8_t *data, uint32_t dataSize) = 0;
-        virtual bool getProperty(int propId, uint8_t *recvData, uint32_t recvDataSize) = 0;
+        virtual bool getProperty(int propId, uint8_t *recvData, uint32_t *recvDataSize) = 0;
  
         virtual StreamType streamType() const = 0;
     };

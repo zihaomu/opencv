@@ -61,7 +61,7 @@ namespace cv
                 virtual ~IUvcStreamChannel() noexcept {}
 
                 virtual bool setProperty(int propId, const uint8_t *data, uint32_t dataSize) override;
-                virtual bool getProperty(int propId, uint8_t *recvData, uint32_t recvDataSize) override;
+                virtual bool getProperty(int propId, uint8_t *recvData, uint32_t *recvDataSize) override;
                 virtual StreamType streamType() const override;
 
             protected:

@@ -659,11 +659,25 @@ enum { CAP_PROP_IMAGES_BASE = 18000,
     @{
 */
 //! OBSENSOR data given from iamge generator
-enum
-{
-  CAP_OBSENSOR_DEPTH_MAP = 0, //!< Depth values in mm (CV_16UC1)
-  CAP_OBSENSOR_BGR_IMAGE = 1, //!< Data given from BGR image sensor
-  CAP_OBSENSOR_IR_IMAGE = 2   //!< Data given from IR image sensor(CV_16UC1)
+enum { CAP_OBSENSOR_DEPTH_MAP = 0, //!< Depth values in mm (CV_16UC1)
+       CAP_OBSENSOR_BGR_IMAGE = 1, //!< Data given from BGR stream generator
+       CAP_OBSENSOR_IR_IMAGE = 2   //!< Data given from IR stream generator(CV_16UC1)
+};
+
+//! OBSENSOR stream generator
+enum { CAP_OBSENSOR_DEPTH_GENERATOR = 1 << 29,
+       CAP_OBSENSOR_IMAGE_GENERATOR = 1 << 28,
+       CAP_OBSENSOR_IR_GENERATOR    = 1 << 27,  
+       CAP_OBSENSOR_GENERATORS_MASK = CAP_OBSENSOR_DEPTH_GENERATOR + CAP_OBSENSOR_IMAGE_GENERATOR + CAP_OBSENSOR_IR_GENERATOR
+};
+
+//! property id enum list
+enum {
+      // INTRINSIC
+      CAP_PROP_OBSENSOR_INTRINSIC_FX=0,
+      CAP_PROP_OBSENSOR_INTRINSIC_FY=1,
+      CAP_PROP_OBSENSOR_INTRINSIC_CX=2,
+      CAP_PROP_OBSENSOR_INTRINSIC_CY=3,
 };
 
 //! @} OBSENSOR
