@@ -204,10 +204,10 @@ namespace cv
             WCHAR *buffer = new wchar_t[devInfo_.id.length() + 1];
             MultiByteToWideChar(CP_UTF8, 0, devInfo_.id.c_str(), devInfo_.id.length() + 1, buffer, devInfo_.id.length() * sizeof(WCHAR));
             HR_FAILED_EXEC(deviceAttrs_->SetString(MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_SYMBOLIC_LINK, buffer), {
-                delete buffer;
+                delete[] buffer;
                 return;
             })
-            delete buffer;
+            delete[] buffer;
             HR_FAILED_RETURN(MFCreateDeviceSource(deviceAttrs_.Get(), &deviceSource_));
             HR_FAILED_RETURN(deviceSource_->QueryInterface(__uuidof(IAMCameraControl), reinterpret_cast<void **>(&cameraControl_)));
             HR_FAILED_RETURN(deviceSource_->QueryInterface(__uuidof(IAMVideoProcAmp), reinterpret_cast<void **>(&videoProcAmp_)));
@@ -326,8 +326,9 @@ namespace cv
 
                         // wait for frame
                         std::unique_lock<std::mutex> lock(streamStateMutex_);
-                        auto success = streamStateCv_.wait_for(lock, std::chrono::milliseconds(3000), [&]()
-                                                               { return streamState_ == STREAM_STARTED; });
+                        auto success = streamStateCv_.wait_for(lock, std::chrono::milliseconds(3000), [&]() { 
+                            return streamState_ == STREAM_STARTED; 
+                        });
                         if (!success)
                         {
                             stop();
@@ -352,8 +353,9 @@ namespace cv
                 streamReader_->SetStreamSelection(currentStreamIndex_, false);
                 streamReader_->Flush(currentStreamIndex_);
                 std::unique_lock<std::mutex> lk(streamStateMutex_);
-                streamStateCv_.wait_for(lk, std::chrono::milliseconds(1000), [&]()
-                                        { return streamState_ == STREAM_STOPED; });
+                streamStateCv_.wait_for(lk, std::chrono::milliseconds(1000), [&](){ 
+                    return streamState_ == STREAM_STOPED; 
+                });
             }
         }
         

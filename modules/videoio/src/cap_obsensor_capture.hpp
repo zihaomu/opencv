@@ -38,11 +38,11 @@ private:
 
     Mat depthFrame_;
     Mat irFrame_;
-    Mat rgbFrame_;
+    Mat colorFrame_;
 
     Mat grabbedDepthFrame_;
     Mat grabbedIrFrame_;
-    Mat grabbedRgbFrame_;
+    Mat grabbedColorFrame_;
 
     obsensor::CameraParam camParam_;
 };

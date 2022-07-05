@@ -66,7 +66,6 @@ namespace obsensor{
 
         uint8_t *xuRecvBuf_;
         uint8_t *xuSendBuf_;
-        std::shared_ptr<DepthFrameProcessor> depthFrameProcessor_;
     };
 
 } // namespace obsensor

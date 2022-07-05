@@ -53,7 +53,7 @@ namespace cv
                 return OBSENSOR_STREAM_IR;
             }
 
-            return OBSENSOR_STREAM_RGB; // else
+            return OBSENSOR_STREAM_COLOR; // else
         }
 
         FrameFormat frameFourccToFormat(uint32_t fourcc)
@@ -207,7 +207,7 @@ namespace cv
             case CAMERA_PARAM:
                 rst &= setXu(2, OB_EXT_CMD5, sizeof(OB_EXT_CMD5));
                 rst &= getXu(2, &rcvData, &rcvLen);
-                if(rst && OB_EXT_CMD5[6] == rcvData[6] && rcvData[8]==0 && rcvData[8]==0){
+                if(rst && OB_EXT_CMD5[6] == rcvData[6] && rcvData[8]==0 && rcvData[9]==0){
                     memcpy(recvData, rcvData + 10, rcvLen - 10);
                     *recvDataSize = rcvLen - 10;
                 }
@@ -225,7 +225,7 @@ namespace cv
                 uint8_t *rcvData;
                 uint32_t rcvLen;
                 if(getXu(1, &rcvData, &rcvLen) && OB_EXT_CMD4[6] == rcvData[6] && rcvData[8]==0&&rcvData[9]==0){
-                    depthFrameProcessor_ = std::make_shared<DepthFrameProcessor>(*(OBExtensionParam*)(rcvData+10));
+                    depthFrameProcessor_ = std::make_shared<DepthFrameProcessor>(*(OBExtensionParam*)(rcvData + 10));
                     return true;
                 }
             }

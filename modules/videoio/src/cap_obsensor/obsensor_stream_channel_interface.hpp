@@ -17,7 +17,7 @@ namespace obsensor{
     typedef enum
     {
         OBSENSOR_STREAM_IR = 1,
-        OBSENSOR_STREAM_RGB = 2,
+        OBSENSOR_STREAM_COLOR = 2,
         OBSENSOR_STREAM_DEPTH = 3,
     } StreamType;
 

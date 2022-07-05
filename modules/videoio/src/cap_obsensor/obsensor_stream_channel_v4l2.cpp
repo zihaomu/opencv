@@ -305,13 +305,13 @@ namespace obsensor{
             xuSendBuf_ = new uint8_t[XU_MAX_DATA_LENGTH];
         }
         memcpy(xuSendBuf_, data, len);
-        struct uvc_xu_control_query xu_ctrl_query =
-            {
-                .unit = XU_UNIT_ID,
-                .selector = ctrl,
-                .query = UVC_SET_CUR,
-                .size = ctrl == 1 ? 512 : (ctrl == 2 ? 64 : 1024),
-                .data = xuSendBuf_};
+        struct uvc_xu_control_query xu_ctrl_query ={
+            .unit = XU_UNIT_ID,
+            .selector = ctrl,
+            .query = UVC_SET_CUR,
+            .size = ctrl == 1 ? 512 : (ctrl == 2 ? 64 : 1024),
+            .data = xuSendBuf_
+        };
         if (devFd_ > 0)
         {
             IOCTL_FAILED_EXEC(xioctl(devFd_, UVCIOC_CTRL_QUERY, &xu_ctrl_query), { return false; });
@@ -325,17 +325,18 @@ namespace obsensor{
         {
             xuRecvBuf_ = new uint8_t[XU_MAX_DATA_LENGTH];
         }
-        struct uvc_xu_control_query xu_ctrl_query =
-            {
-                .unit = XU_UNIT_ID,
-                .selector = ctrl,
-                .query = UVC_GET_CUR,
-                .size = ctrl == 1 ? 512 : (ctrl == 2 ? 64 : 1024),
-                .data = xuRecvBuf_};
+        struct uvc_xu_control_query xu_ctrl_query = {
+            .unit = XU_UNIT_ID,
+            .selector = ctrl,
+            .query = UVC_GET_CUR,
+            .size = ctrl == 1 ? 512 : (ctrl == 2 ? 64 : 1024),
+            .data = xuRecvBuf_
+        };
 
         IOCTL_FAILED_EXEC(xioctl(devFd_, UVCIOC_CTRL_QUERY, &xu_ctrl_query), {
             *len = 0;
-            return false; });
+            return false; 
+        });
 
         *len = xu_ctrl_query.size;
         *data = xuRecvBuf_;
@@ -348,9 +349,9 @@ namespace obsensor{
         {
             streamState_ = STREAM_STOPPING;
             std::unique_lock<std::mutex> lk(streamStateMutex_);
-            streamStateCv_.wait_for(lk, std::chrono::milliseconds(1000), [&]()
-                                    { return streamState_ == STREAM_STOPED; });
-
+            streamStateCv_.wait_for(lk, std::chrono::milliseconds(1000), [&](){ 
+                return streamState_ == STREAM_STOPED; 
+            });
             uint32_t type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
             IOCTL_FAILED_LOG(xioctl(devFd_, VIDIOC_STREAMOFF, &type));
         }
