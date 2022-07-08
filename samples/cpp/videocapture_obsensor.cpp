@@ -4,7 +4,7 @@
 #include <iostream>
 
 using namespace cv;
-int main(int argc, char *argv[])
+int main()
 {
     VideoCapture obsensorCapture(0, CAP_OBSENSOR);
     double fx = obsensorCapture.get(CAP_PROP_OBSENSOR_INTRINSIC_FX);

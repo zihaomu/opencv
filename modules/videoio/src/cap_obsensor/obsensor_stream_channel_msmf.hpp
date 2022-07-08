@@ -2,9 +2,9 @@
 // It is subject to the license terms in the LICENSE file found in the top-level directory
 // of this distribution and at http://opencv.org/license.html.
 
-/* 
+/*
 * Copyright(C) 2022 by ORBBEC Technology., Inc.
-* Authors: 
+* Authors:
 *   Huang Zhenchang <yufeng@orbbec.com>
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,8 +19,8 @@
 * limitations under the License.
 */
 
-#ifndef _CAP_OBSENSOR_STREAM_CHANNEL_MSMF_HPP_
-#define _CAP_OBSENSOR_STREAM_CHANNEL_MSMF_HPP_
+#ifndef OPENCV_VIDEOIO_OBSENSOR_STREAM_CHANNEL_MSMF_HPP
+#define OPENCV_VIDEOIO_OBSENSOR_STREAM_CHANNEL_MSMF_HPP
 #ifdef HAVE_OBSENSOR_MSMF
 
 #include "obsensor_uvc_stream_channel.hpp"
@@ -42,144 +42,139 @@
 #include <ksproxy.h> //IKsControl
 #include <ksmedia.h> 
 
-namespace cv{
-namespace obsensor{
-    template <class T>
-    class ComPtr
+namespace cv {
+namespace obsensor {
+template <class T>
+class ComPtr
+{
+public:
+    ComPtr(){}
+    ComPtr(T* lp)
     {
-    public:
-        ComPtr()
-        {
-        }
-        ComPtr(T *lp)
-        {
-            p = lp;
-        }
-        ComPtr(_In_ const ComPtr<T> &lp)
-        {
-            p = lp.p;
-        }
-        virtual ~ComPtr()
-        {
-        }
-
-        void swap(_In_ ComPtr<T> &lp)
-        {
-            ComPtr<T> tmp(p);
-            p = lp.p;
-            lp.p = tmp.p;
-            tmp = NULL;
-        }
-        T **operator&()
-        {
-            CV_Assert(p == NULL);
-            return p.operator&();
-        }
-        T *operator->() const
-        {
-            CV_Assert(p != NULL);
-            return p.operator->();
-        }
-        operator bool()
-        {
-            return p.operator!=(NULL);
-        }
-
-        T *Get() const
-        {
-            return p;
-        }
-
-        void Release()
-        {
-            if (p)
-                p.Release();
-        }
-
-        // query for U interface
-        template <typename U>
-        HRESULT As(_Out_ ComPtr<U> &lp) const
-        {
-            lp.Release();
-            return p->QueryInterface(__uuidof(U), reinterpret_cast<void **>((T **)&lp));
-        }
-
-    private:
-        _COM_SMARTPTR_TYPEDEF(T, __uuidof(T));
-        TPtr p;
-    };
-
-    class MFContext
+        p = lp;
+    }
+    ComPtr(_In_ const ComPtr<T>& lp)
     {
-    public:
-        ~MFContext(void);
-        static MFContext &getInstance();
+        p = lp.p;
+    }
+    virtual ~ComPtr(){}
 
-        std::vector<UvcDeviceInfo> queryUvcDeviceInfoList();
-        std::shared_ptr<IStreamChannel> createStreamChannel(const UvcDeviceInfo &devInfo);
-
-    private:
-        MFContext(void);
-    };
-
-    typedef struct FrameRate
+    void swap(_In_ ComPtr<T>& lp)
     {
-        unsigned int denominator;
-        unsigned int numerator;
-    } FrameRate;
-
-    class MSMFStreamChannel : public IUvcStreamChannel, public IMFSourceReaderCallback
+        ComPtr<T> tmp(p);
+        p = lp.p;
+        lp.p = tmp.p;
+        tmp = NULL;
+    }
+    T** operator&()
     {
-    public:
-        MSMFStreamChannel(const UvcDeviceInfo &devInfo);
-        virtual ~MSMFStreamChannel() noexcept;
+        CV_Assert(p == NULL);
+        return p.operator&();
+    }
+    T* operator->() const
+    {
+        CV_Assert(p != NULL);
+        return p.operator->();
+    }
+    operator bool()
+    {
+        return p.operator!=(NULL);
+    }
 
-        virtual void start(const StreamProfile &profile, FrameCallback frameCallback) override;
-        virtual void stop() override;
+    T* Get() const
+    {
+        return p;
+    }
 
-    private:
-        virtual bool setXu(uint8_t ctrl, const uint8_t *data, uint32_t len) override;
-        virtual bool getXu(uint8_t ctrl, uint8_t **data, uint32_t *len) override;
+    void Release()
+    {
+        if (p)
+            p.Release();
+    }
 
-    private:
-        MFContext &mfContext_;
+    // query for U interface
+    template <typename U>
+    HRESULT As(_Out_ ComPtr<U>& lp) const
+    {
+        lp.Release();
+        return p->QueryInterface(__uuidof(U), reinterpret_cast<void**>((T**)&lp));
+    }
 
-        ComPtr<IMFAttributes> deviceAttrs_ = nullptr;
-        ComPtr<IMFMediaSource> deviceSource_ = nullptr;
-        ComPtr<IMFAttributes> readerAttrs_ = nullptr;
-        ComPtr<IMFSourceReader> streamReader_ = nullptr;
-        ComPtr<IAMCameraControl> cameraControl_ = nullptr;
-        ComPtr<IAMVideoProcAmp> videoProcAmp_ = nullptr;
-        ComPtr<IKsTopologyInfo> xuKsTopologyInfo_ = nullptr;
-        ComPtr<IUnknown> xuNodeInstance_ = nullptr;
-        ComPtr<IKsControl> xuKsControl_ = nullptr;
-        int xuNodeId_;
+private:
+    _COM_SMARTPTR_TYPEDEF(T, __uuidof(T));
+    TPtr p;
+};
 
-        FrameCallback frameCallback_;
-        StreamProfile currentProfile_;
-        int8_t currentStreamIndex_;
+class MFContext
+{
+public:
+    ~MFContext(void);
+    static MFContext& getInstance();
 
-        StreamState streamState_;
-        std::mutex streamStateMutex_;
-        std::condition_variable streamStateCv_;
+    std::vector<UvcDeviceInfo> queryUvcDeviceInfoList();
+    std::shared_ptr<IStreamChannel> createStreamChannel(const UvcDeviceInfo& devInfo);
 
-        uint8_t *xuRecvBuf_;
-        uint8_t *xuSendBuf_;
+private:
+    MFContext(void);
+};
 
-    public:
-        STDMETHODIMP QueryInterface(REFIID iid, void **ppv) override;
-        STDMETHODIMP_(ULONG)
+typedef struct FrameRate
+{
+    unsigned int denominator;
+    unsigned int numerator;
+} FrameRate;
+
+class MSMFStreamChannel : public IUvcStreamChannel, public IMFSourceReaderCallback
+{
+public:
+    MSMFStreamChannel(const UvcDeviceInfo& devInfo);
+    virtual ~MSMFStreamChannel() noexcept;
+
+    virtual void start(const StreamProfile& profile, FrameCallback frameCallback) override;
+    virtual void stop() override;
+
+private:
+    virtual bool setXu(uint8_t ctrl, const uint8_t* data, uint32_t len) override;
+    virtual bool getXu(uint8_t ctrl, uint8_t** data, uint32_t* len) override;
+
+private:
+    MFContext& mfContext_;
+
+    ComPtr<IMFAttributes> deviceAttrs_ = nullptr;
+    ComPtr<IMFMediaSource> deviceSource_ = nullptr;
+    ComPtr<IMFAttributes> readerAttrs_ = nullptr;
+    ComPtr<IMFSourceReader> streamReader_ = nullptr;
+    ComPtr<IAMCameraControl> cameraControl_ = nullptr;
+    ComPtr<IAMVideoProcAmp> videoProcAmp_ = nullptr;
+    ComPtr<IKsTopologyInfo> xuKsTopologyInfo_ = nullptr;
+    ComPtr<IUnknown> xuNodeInstance_ = nullptr;
+    ComPtr<IKsControl> xuKsControl_ = nullptr;
+    int xuNodeId_;
+
+    FrameCallback frameCallback_;
+    StreamProfile currentProfile_;
+    int8_t currentStreamIndex_;
+
+    StreamState streamState_;
+    std::mutex streamStateMutex_;
+    std::condition_variable streamStateCv_;
+
+    uint8_t* xuRecvBuf_;
+    uint8_t* xuSendBuf_;
+
+public:
+    STDMETHODIMP QueryInterface(REFIID iid, void** ppv) override;
+    STDMETHODIMP_(ULONG)
         AddRef() override;
-        STDMETHODIMP_(ULONG)
+    STDMETHODIMP_(ULONG)
         Release() override;
-        STDMETHODIMP OnReadSample(HRESULT /*hrStatus*/, DWORD dwStreamIndex, DWORD /*dwStreamFlags*/, LONGLONG /*llTimestamp*/, IMFSample *sample) override;
-        STDMETHODIMP OnEvent(DWORD /*sidx*/, IMFMediaEvent * /*event*/) override;
-        STDMETHODIMP OnFlush(DWORD) override;
+    STDMETHODIMP OnReadSample(HRESULT /*hrStatus*/, DWORD dwStreamIndex, DWORD /*dwStreamFlags*/, LONGLONG /*llTimestamp*/, IMFSample* sample) override;
+    STDMETHODIMP OnEvent(DWORD /*sidx*/, IMFMediaEvent* /*event*/) override;
+    STDMETHODIMP OnFlush(DWORD) override;
 
-    private:
-        long refCount_ = 1;
-    };
-} // namespace obsensor
-} // namespace cv::obsensor
+private:
+    long refCount_ = 1;
+};
+}} // namespace cv::obsensor::
 #endif // HAVE_OBSENSOR_MSMF
-#endif // _CAP_OBSENSOR_STREAM_CHANNEL_MSMF_HPP_
+#endif // OPENCV_VIDEOIO_OBSENSOR_STREAM_CHANNEL_MSMF_HPP
