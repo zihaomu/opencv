@@ -33,8 +33,7 @@ Ptr<IVideoCapture> create_obsensor_capture(int index)
 VideoCapture_obsensor::VideoCapture_obsensor(int index) : isOpened_(false)
 {
     static const obsensor::StreamProfile colorProfile = { 640, 480, 30, obsensor::FRAME_FORMAT_MJPG };
-    static const obsensor::StreamProfile depthProfile = { 640, 480, 30, obsensor::FRAME_FORMAT_Y16 };
-    static const obsensor::StreamProfile irProfile = { 640, 480, 30, obsensor::FRAME_FORMAT_Y16 };
+    static const obsensor::StreamProfile depthProfile = {640, 480, 30, obsensor::FRAME_FORMAT_Y16};
 
     streamChannelGroup_ = obsensor::getStreamChannelGroup(index);
     if (!streamChannelGroup_.empty())
@@ -61,12 +60,6 @@ VideoCapture_obsensor::VideoCapture_obsensor(int index) : isOpened_(false)
                 memset(&camParam_, 0, sizeof(camParam_));
                 channel->getProperty(obsensor::CAMERA_PARAM, (uint8_t*)&camParam_, &len);
                 break;
-            case obsensor::OBSENSOR_STREAM_IR:
-                channel->start(irProfile, [&](obsensor::Frame* frame) {
-                    std::unique_lock<std::mutex> lk(frameMutex_);
-                    irFrame_ = Mat(frame->height, frame->width, CV_16UC1, frame->data, frame->width * 2).clone();
-                    });
-                break;
             default:
                 break;
             }
@@ -80,14 +73,12 @@ bool VideoCapture_obsensor::grabFrame()
     std::unique_lock<std::mutex> lk(frameMutex_);
 
     grabbedDepthFrame_ = depthFrame_;
-    grabbedIrFrame_ = irFrame_;
     grabbedColorFrame_ = colorFrame_;
 
     depthFrame_.release();
-    irFrame_.release();
     colorFrame_.release();
 
-    return !grabbedDepthFrame_.empty() || !grabbedIrFrame_.empty() || !grabbedColorFrame_.empty();
+    return !grabbedDepthFrame_.empty() || !grabbedColorFrame_.empty();
 }
 
 bool VideoCapture_obsensor::retrieveFrame(int outputType, OutputArray frame)
@@ -100,14 +91,6 @@ bool VideoCapture_obsensor::retrieveFrame(int outputType, OutputArray frame)
         {
             grabbedDepthFrame_.copyTo(frame);
             grabbedDepthFrame_.release();
-            return true;
-        }
-        break;
-    case CAP_OBSENSOR_IR_IMAGE:
-        if (!grabbedIrFrame_.empty())
-        {
-            grabbedIrFrame_.copyTo(frame);
-            grabbedIrFrame_.release();
             return true;
         }
         break;
@@ -152,7 +135,8 @@ double VideoCapture_obsensor::getProperty(int propIdx) const {
     return rst;
 }
 
-bool VideoCapture_obsensor::setProperty(int propIdx, double propVal) {
+bool VideoCapture_obsensor::setProperty(int propIdx, double /*propVal*/)
+{
     CV_LOG_WARNING(NULL, "Unsupported or read only property, id=" << propIdx);
     return false;
 }

@@ -53,11 +53,9 @@ private:
     std::mutex frameMutex_;
 
     Mat depthFrame_;
-    Mat irFrame_;
     Mat colorFrame_;
 
     Mat grabbedDepthFrame_;
-    Mat grabbedIrFrame_;
     Mat grabbedColorFrame_;
 
     obsensor::CameraParam camParam_;

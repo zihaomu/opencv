@@ -16,8 +16,6 @@ int main()
     Mat image;
     Mat depthMap;
     Mat adjDepthMap;
-    Mat irImage;
-    Mat adjIrImage;
     while (true)
     {
         // obsensorCapture >> depthMap;
@@ -39,12 +37,6 @@ int main()
                 normalize(depthMap, adjDepthMap, 0, 255, NORM_MINMAX, CV_8UC1);
                 applyColorMap(adjDepthMap, adjDepthMap, COLORMAP_JET);
                 imshow("DEPTH", adjDepthMap);
-            }
-
-            if (obsensorCapture.retrieve(irImage, CAP_OBSENSOR_IR_IMAGE))
-            {
-                normalize(irImage, adjIrImage, 0, 255, NORM_MINMAX, CV_8UC1);
-                imshow("IR", adjIrImage);
             }
 
             const float alpha = 0.6f;
