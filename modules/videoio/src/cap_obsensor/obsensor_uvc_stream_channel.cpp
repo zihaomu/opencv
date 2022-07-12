@@ -59,7 +59,9 @@ const std::map<uint32_t, FrameFormat> fourccToOBFormat = {
 StreamType parseUvcDeviceNameToStreamType(const std::string& devName)
 {
     std::string uvcDevName = devName;
-    std::transform(begin(uvcDevName), end(uvcDevName), begin(uvcDevName), ::tolower);
+    for (int i = 0; i < uvcDevName.length(); i++) {
+        uvcDevName[i] = (char)tolower(uvcDevName[i]); 
+    }
     if (uvcDevName.find(" depth") != std::string::npos)
     {
         return OBSENSOR_STREAM_DEPTH;

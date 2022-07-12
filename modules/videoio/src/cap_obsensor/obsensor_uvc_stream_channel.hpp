@@ -49,6 +49,7 @@ typedef enum
     STREAM_STOPPING = 3,
 } StreamState;
 
+StreamType parseUvcDeviceNameToStreamType(const std::string& devName);
 FrameFormat frameFourccToFormat(uint32_t fourcc);
 uint32_t frameFormatToFourcc(FrameFormat);
 

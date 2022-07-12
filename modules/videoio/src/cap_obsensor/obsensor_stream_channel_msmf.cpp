@@ -95,7 +95,9 @@ bool parseUvcDeviceSymbolicLink(const std::string& symbolicLink, uint16_t& vid, 
     std::string& device_guid)
 {
     std::string lowerStr = symbolicLink;
-    std::transform(begin(lowerStr), end(lowerStr), begin(lowerStr), ::tolower);
+    for (int i = 0; i < lowerStr.length(); i++) {
+        lowerStr[i] = (char)tolower(lowerStr[i]); 
+    }
     auto tokens = stringSplit(lowerStr, '#');
     if (tokens.size() < 1 || (tokens[0] != R"(\\?\usb)" && tokens[0] != R"(\\?\hid)"))
         return false; // Not a USB device
@@ -218,7 +220,7 @@ MSMFStreamChannel::MSMFStreamChannel(const UvcDeviceInfo& devInfo) :
     HR_FAILED_RETURN(MFCreateAttributes(&deviceAttrs_, 2));
     HR_FAILED_RETURN(deviceAttrs_->SetGUID(MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE, MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_GUID));
     WCHAR* buffer = new wchar_t[devInfo_.id.length() + 1];
-    MultiByteToWideChar(CP_UTF8, 0, devInfo_.id.c_str(), devInfo_.id.length() + 1, buffer, devInfo_.id.length() * sizeof(WCHAR));
+    MultiByteToWideChar(CP_UTF8, 0, devInfo_.id.c_str(), (int)devInfo_.id.length() + 1, buffer, (int)devInfo_.id.length() * sizeof(WCHAR));
     HR_FAILED_EXEC(deviceAttrs_->SetString(MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_SYMBOLIC_LINK, buffer), {
         delete[] buffer;
         return;
