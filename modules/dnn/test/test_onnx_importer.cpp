@@ -1834,6 +1834,12 @@ TEST_P(Test_ONNX_layers, Quantized_Split)
     testONNXModels("quantized_split");
 }
 
+TEST_P(Test_ONNX_layers, Moo)
+{
+    String path = "/Users/zihaomu/work/opencv_dev/data_test/models/resnet50-v1-12_qdq.onnx";
+    Net net = readNet(path);
+}
+
 TEST_P(Test_ONNX_layers, Quantized_Pad)
 {
     testONNXModels("quantized_padding");
