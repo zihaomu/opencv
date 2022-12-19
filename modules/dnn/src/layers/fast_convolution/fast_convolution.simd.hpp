@@ -11,6 +11,114 @@
 namespace cv {
 namespace dnn {
 
+void convBlockMR1(int np, const float* a, const float* b, float *c, const float bias, bool init_c,
+                  const float minval, const float maxval, bool ifMinMaxAct)
+{
+#if CV_SIMD128
+    v_float32x4 c0  = v_setall_f32(bias), c1 = c0, c2 = c0; // CONV_NR == 12
+#if CONV_NR == 28 || CONV_NR == 24
+    v_float32x4 c3 = c0, c4 = c0, c5 = c0;
+#endif
+#if CONV_NR == 28
+    v_float32x4 c6 = c0;
+#endif
+    for (int p = 0; p < np; p++, a++, b+= CONV_NR)
+    {
+        v_float32x4 a0 = v_setall_f32(a[0]);
+        v_float32x4 b0 = v_load(b), b1 = v_load(b + 4), b2 = v_load(b + 8);
+#if CONV_NR == 28 || CONV_NR == 24
+        v_float32x4 b3 = v_load(b + 12), b4 = v_load(b + 16), b5 = v_load(b + 20);
+#endif
+#if CONV_NR == 28
+        v_float32x4 b6 = v_load(b + 24);
+#endif
+
+        c0 = v_fma(b0, a0, c0);
+        c1 = v_fma(b1, a0, c1);
+        c2 = v_fma(b2, a0, c2);
+#if CONV_NR == 28 || CONV_NR == 24
+        c3 = v_fma(b3, a0, c3);
+        c4 = v_fma(b4, a0, c4);
+        c5 = v_fma(b5, a0, c5);
+#endif
+#if CONV_NR == 28
+        c6 = v_fma(b6, a0, c6);
+#endif
+    }
+
+    if (init_c)
+    {
+        c0 += v_load(c);
+        c1 += v_load(c + 4);
+        c2 += v_load(c + 8);
+#if CONV_NR == 28 || CONV_NR == 24
+        c3 += v_load(c + 12);
+        c4 += v_load(c + 16);
+        c5 += v_load(c + 20);
+#endif
+#if CONV_NR == 28
+        c6  += v_load(c + 24);
+#endif
+    }
+
+    if (ifMinMaxAct)
+    {
+       v_float32x4 vmax = v_setall_f32(maxval), vmin = v_setall_f32(minval);
+       c0 = v_min(v_max(c0, vmin), vmax);
+       c1 = v_min(v_max(c1, vmin), vmax);
+       c2 = v_min(v_max(c2, vmin), vmax);
+#if CONV_NR == 28 || CONV_NR == 24
+       c3 = v_min(v_max(c3, vmin), vmax);
+       c4 = v_min(v_max(c4, vmin), vmax);
+       c5 = v_min(v_max(c5, vmin), vmax);
+#endif
+#if CONV_NR == 28
+       c6 = v_min(v_max(c6, vmin), vmax);
+#endif
+    }
+
+    v_store(c, c0);
+    v_store(c + 4, c1);
+    v_store(c + 8, c2);
+#if CONV_NR == 28 || CONV_NR == 24
+    v_store(c + 12, c3);
+    v_store(c + 16, c4);
+    v_store(c + 20, c5);
+#endif
+#if CONV_NR == 28
+    v_store(c + 24, c6);
+#endif
+#else
+    float cbuf[CONV_NR];
+    memset(cbuf, 0, sizeof(cbuf));
+    for( int p = 0; p < np; p++ )
+    {
+        float ai = a[p];
+        for( int j = 0; j < CONV_NR; j++ )
+            cbuf[j] += b[CONV_NR*p + j] * ai;
+    }
+
+    if (init_c)
+    {
+        for(int j = 0; j < CONV_NR; j++)
+        {
+            c[j] += cbuf[j] + bias;
+            if (ifMinMaxAct)
+                c[j] = std::min(std::max(c[j], minval), maxval);
+        }
+    }
+    else
+    {
+        for(int j = 0; j < CONV_NR; j++)
+        {
+            c[j] = cbuf[j] + bias;
+            if (ifMinMaxAct)
+                c[j] = std::min(std::max(c[j], minval), maxval);
+        }
+    }
+#endif
+}
+
 void convBlock(int np, const float* a, const float* b, float* c, int ldc, bool init_c)
 {
 #if CV_SIMD128 && CONV_MR == 4 && CONV_NR == 24
@@ -127,13 +235,19 @@ void convBlock(int np, const float* a, const float* b, float* c, int ldc, bool i
                 cbuf[i * CONV_NR+j] += b[CONV_NR*p + j] * ai;
         }
     }
-    if (!init_c) {
-        for(int i = 0; i < CONV_MR; i++) {
+
+    if (!init_c)
+    {
+        for(int i = 0; i < CONV_MR; i++)
+        {
             for(int j = 0; j < CONV_NR; j++)
                 c[i*ldc + j] += cbuf[i*CONV_NR + j];
         }
-    } else {
-        for(int i = 0; i < CONV_MR; i++) {
+    }
+    else
+    {
+        for(int i = 0; i < CONV_MR; i++)
+        {
             for(int j = 0; j < CONV_NR; j++)
                 c[i*ldc + j] = cbuf[i*CONV_NR + j];
         }
