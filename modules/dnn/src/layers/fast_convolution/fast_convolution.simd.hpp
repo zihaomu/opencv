@@ -11,7 +11,7 @@
 namespace cv {
 namespace dnn {
 
-static void convBlockMR1NoSIMD(int np, const float* a, const float* b, float *c, const float bias, bool init_c,
+static inline void convBlockMR1NoSIMD(int np, const float* a, const float* b, float *c, const float bias, bool init_c,
                                const float minval, const float maxval, bool ifMinMaxAct, const int outLen)
 {
     std::vector<float> cbuffer(outLen, 0);
@@ -135,7 +135,7 @@ void convBlockMR1(int np, const float* a, const float* b, float *c, const float 
 
 #if CV_SIMD128
 #if CONV_MR == 4 && CONV_NR == 24
-static void convBlock4x24(int np, const float* a, const float* b, float* c, int ldc, bool init_c)
+static inline void convBlock4x24(int np, const float* a, const float* b, float* c, int ldc, bool init_c)
 {
     v_float32x4 c0  = v_setzero_f32(), c1 = c0, c2 = c0, c3 = c0, c4 = c0, c5 = c0;
     v_float32x4 c6  = v_setzero_f32(), c7 = c6, c8 = c6, c9 = c6, c10 = c6, c11 = c6;
@@ -241,7 +241,7 @@ static void convBlock4x24(int np, const float* a, const float* b, float* c, int 
 }
 #endif
 
-static void convBlock4x8(int np, const float* a, const float* b, float* c, int ldc, bool init_c)
+static inline void convBlock4x8(int np, const float* a, const float* b, float* c, int ldc, bool init_c)
 {
     CV_Assert(CONV_NR >= 4);
     v_float32x4 c0  = v_setzero_f32(), c1 = c0, c2 = c0, c3 = c0;
@@ -294,7 +294,7 @@ static void convBlock4x8(int np, const float* a, const float* b, float* c, int l
     v_store(c + ldc * 3 + 4, c7);
 }
 
-static void convBlock4x4(int np, const float* a, const float* b, float* c, int ldc, bool init_c)
+static inline void convBlock4x4(int np, const float* a, const float* b, float* c, int ldc, bool init_c)
 {
     CV_Assert(CONV_NR >= 4);
     v_float32x4 c0  = v_setzero_f32(), c1 = c0, c2 = c0, c3 = c0;
@@ -329,7 +329,7 @@ static void convBlock4x4(int np, const float* a, const float* b, float* c, int l
 }
 #endif
 
-static void convBlockNoSIMD(int np, const float* a, const float* b, float* c, int ldc, bool init_c, const int outLen)
+static inline void convBlockNoSIMD(int np, const float* a, const float* b, float* c, int ldc, bool init_c, const int outLen)
 {
     std::vector<float> cbuffer(CONV_MR * outLen, 0);
     float* cbuf = cbuffer.data();

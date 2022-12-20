@@ -271,7 +271,7 @@ Ptr<FastConv> initFastConv(
     return conv;
 }
 
-static void packData8(float*& inpbuf, float*& inptrIn, int& in_w, int& x0, int& s0, const int* ofstab,
+static inline void packData8(float*& inpbuf, float*& inptrIn, int& in_w, int& x0, int& s0, const int* ofstab,
                       const int stride_w, const int ksize)
 {
     float* inpbufC = inpbuf + s0;
@@ -327,7 +327,7 @@ static void packData8(float*& inpbuf, float*& inptrIn, int& in_w, int& x0, int& 
     in_w += 7*stride_w;
 }
 
-static void packData2(float*& inpbuf, float*& inptrIn, int& in_w, int& x0, int& s0, const int* ofstab,
+static inline void packData2(float*& inpbuf, float*& inptrIn, int& in_w, int& x0, int& s0, const int* ofstab,
                       const int stride_w, const int ksize)
 {
     float* inpbufC = inpbuf + s0;
