@@ -417,10 +417,10 @@ void runFastConv(InputArray _input, OutputArray _output, const Ptr<FastConv>& co
             }
     }
 
-    int MAX_STRIPES = 2; // (56 + CONV_NR - 1)/CONV_NR;
+    int MAX_STRIPES = 32; // (56 + CONV_NR - 1)/CONV_NR;
 
     // Friendly to L1 cache
-    const int K_BLOCK_SIZE = 32;
+    const int K_BLOCK_SIZE = conv->conv_type == _FX_CONV_TYPE_DEPTHWISE_REMAIN ? 1 : 32;
     const int C_BLOCK_SIZE = 256;
 
     int Kg_nblocks = (Kg + CONV_MR-1)/CONV_MR, Kg_aligned = Kg_nblocks * CONV_MR;
@@ -434,6 +434,8 @@ void runFastConv(InputArray _input, OutputArray _output, const Ptr<FastConv>& co
     }
     else
         Kg_nblocks = 1;
+
+    bool kernelMajorPack = Cg == 1 && ksize > 21; // Spacial data pack branch for big kernel depth-wise.
 
     int Kstripes = Kg_nblocks*stripes_per_sample;
     int nsubtasks = N*ngroups*Kstripes;
@@ -501,8 +503,8 @@ void runFastConv(InputArray _input, OutputArray _output, const Ptr<FastConv>& co
 
                 for (int stripe = 0; zyx0 < zyx_block_limit; stripe++, zyx0 += CONV_NR)
                 {
-                    float* inpbuf = inpbuf_task + stripe * stripesize;
-                    float* inptr = inp + inp_plane_ofs;
+                    float *inpbuf = inpbuf_task + stripe * stripesize;
+                    float *inptr = inp + inp_plane_ofs;
 
                     /*
                         1. pack the data. Copy the HkxWk CONV_NR-wide slices from
@@ -523,7 +525,7 @@ void runFastConv(InputArray _input, OutputArray _output, const Ptr<FastConv>& co
                             // Make special branch where memcpy() is called with a constant buffer size.
                             // Compilers will likely unroll this loop properly.
                             for (int c = 0; c < Cg; c++, inptr += inp_planesize, inpbuf += CONV_NR)
-                                memcpy(inpbuf, inptr, CONV_NR*sizeof(inpbuf[0]));
+                                memcpy(inpbuf, inptr, CONV_NR * sizeof(inpbuf[0]));
                         }
                         else
                         {
@@ -531,6 +533,135 @@ void runFastConv(InputArray _input, OutputArray _output, const Ptr<FastConv>& co
                             {
                                 memcpy(inpbuf, inptr, slice_len * sizeof(inpbuf[0]));
                                 memset(inpbuf + slice_len, 0, (CONV_NR - slice_len) * sizeof(inpbuf[0]));
+                            }
+                        }
+                    }
+                    else if (kernelMajorPack)
+                    {
+                        const int CONV_NRCg = CONV_NR * Cg;
+                        const int HW0 = H0 * W0;
+                        const int HWi = Hi * Wi;
+                        int slice_len = std::min(zyx_block_limit - zyx0, CONV_NR);
+
+                        // here some non-continuous sub-row of the row will not be
+                        // filled from the tensor; we need to make sure that the uncovered
+                        // elements are explicitly set to 0's. the easiest way is to
+                        // set all the elements to 0's before the loop.
+                        memset(inpbuf, 0, stripesize*sizeof(inpbuf[0]));
+
+                        int z0 = zyx0 / HW0, yx0 = zyx0 - z0 * HW0;
+                        int y0 = yx0 / W0, x0 = yx0 - y0 * W0;
+
+                        if (conv_dim == CONV_1D || conv_dim == CONV_2D)
+                        {
+                            for (int slice_i = 0; slice_i < slice_len; y0++, x0=0)
+                            {
+                                int delta = std::min(slice_len - slice_i, W0 - x0);
+                                int x1 = x0 + delta;
+
+                                int in_h = y0 * stride_h - pad_top;
+                                int in_w = x0 * stride_w - pad_left;
+
+                                float* inptrIn = inptr + in_h*Wi + in_w;
+
+                                bool ok_i = 0 <= in_h && in_h < Hi - (Hk-1)*dilation_h;
+                                int h0 = std::max(0, (-in_h + dilation_h-1)/dilation_h);
+                                int h1 = std::min(Hk, (Hi - in_h + dilation_h-1)/dilation_h);
+
+                                int s0 = slice_i;
+
+                                for (; x0 < x1; x0++, s0++, inptrIn += stride_w, in_w += stride_w)
+                                {
+                                    if (ok_i && x0 + 2 <= x1 && 0 <= in_w &&
+                                            in_w + stride_w*2 <= Wi - (Wk-1)*dilation_w)
+                                    {
+                                        for( int c = 0; c < Cg; c++ ) // channel
+                                        {
+                                            float* inpbufC = inpbuf + c * CONV_NR + s0;
+                                            float* inptrInC = inptrIn + c * inp_planesize;
+
+                                            for (int k = 0; k < ksize; k++)
+                                            {
+                                                int k1 = ofstab[k];
+                                                float v0 = inptrInC[k1];
+                                                float v1 = inptrInC[k1 + stride_w];
+                                                inpbufC[k*CONV_NRCg] = v0;
+                                                inpbufC[k*CONV_NRCg+1] = v1;
+                                            }
+                                        }
+
+                                        x0++;
+                                        s0++;
+                                        inptrIn += stride_w;
+                                        in_w += stride_w;
+                                    }
+                                    else
+                                    {
+                                        int w0 = std::max(0, (-in_w + dilation_w-1)/dilation_w);
+                                        int w1 = std::min(Wk, (Wi - in_w + dilation_w-1)/dilation_w);
+
+                                        for( int c = 0; c < Cg; c++ ) // channel
+                                        {
+                                            float* inpbufC = inpbuf + c * CONV_NR + s0;
+                                            float* inptrInC = inptrIn + c * inp_planesize;
+
+                                            for (int h = h0; h < h1; h++)
+                                            {
+                                                for (int w = w0; w < w1; w++)
+                                                {
+                                                    int imgofs = h*(dilation_h*Wi) + w*dilation_w;
+                                                    inpbufC[(h*Wk + w)*CONV_NRCg] = inptrInC[imgofs];
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                slice_i += delta;
+                            }
+                        }
+                        else if (conv_dim == CONV_3D)
+                        {
+                            for (int slice_i = 0; slice_i < slice_len; z0 += (y0+1)/H0, y0 = (y0+1)%H0, x0=0)
+                            {
+                                int delta = std::min(slice_len - slice_i, W0 - x0);
+                                int x1 = x0 + delta;
+
+                                int in_d = z0 * stride_d - pad_front;
+                                int in_h = y0 * stride_h - pad_top;
+                                int in_w = x0 * stride_w - pad_left;
+
+                                float* inptrIn = inptr + in_d*HWi + in_h*Wi + in_w;
+
+                                int d0 = std::max(0, (-in_d + dilation_d - 1) / dilation_d);
+                                int d1 = std::min(Dk, (Di - in_d + dilation_d - 1) / dilation_d);
+
+                                int h0 = std::max(0, (-in_h + dilation_h-1)/dilation_h);
+                                int h1 = std::min(Hk, (Hi - in_h + dilation_h-1)/dilation_h);
+
+                                int s0 = slice_i;
+                                for (; x0 < x1; x0++, s0++, inptrIn += stride_w, in_w += stride_w)
+                                {
+                                    int w0 = std::max(0, (-in_w + dilation_w-1)/dilation_w);
+                                    int w1 = std::min(Wk, (Wi - in_w + dilation_w-1)/dilation_w);
+
+                                    for( int c = 0; c < Cg; c++ ) // channel
+                                    {
+                                        float* inpbufC = inpbuf + c * CONV_NR + s0;
+                                        float* inptrInC = inptrIn + c * inp_planesize;
+                                        for ( int d = d0; d < d1; d++)
+                                        {
+                                            for (int h = h0; h < h1; h++)
+                                            {
+                                                for (int w = w0; w < w1; w++)
+                                                {
+                                                    int imgofs = d*dilation_d*HWi + h*(dilation_h*Wi) + w*dilation_w;
+                                                    inpbufC[((d*Hk + h)*Wk + w)*CONV_NRCg] = inptrInC[imgofs];
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                slice_i += delta;
                             }
                         }
                     }
@@ -542,7 +673,7 @@ void runFastConv(InputArray _input, OutputArray _output, const Ptr<FastConv>& co
                         int y0_ = yx0 / W0, x0_ = yx0 - y0_ * W0;
                         for (int k = 0; k < ksize; k++)
                         {
-                            int dz = dhwTab[k*3], dy = dhwTab[k*3 + 1], dx = dhwTab[k * 3 + 2];
+                            int dz = dhwTab[k * 3], dy = dhwTab[k * 3 + 1], dx = dhwTab[k * 3 + 2];
                             int i = 0, z0 = z0_, y0 = y0_, x0 = x0_;
                             for (; i < CONV_NR;)
                             {
@@ -551,7 +682,8 @@ void runFastConv(InputArray _input, OutputArray _output, const Ptr<FastConv>& co
                                 int yi = y0 * stride_h + dy - pad_top;
                                 int xi = x0 * stride_w + dx - pad_left;
 
-                                if ((unsigned) zi < (unsigned) Di && (unsigned) yi < (unsigned) Hi && (unsigned) xi < (unsigned) Wi)
+                                if ((unsigned) zi < (unsigned) Di && (unsigned) yi < (unsigned) Hi &&
+                                    (unsigned) xi < (unsigned) Wi)
                                 {
                                     const float *inptr_ki = inptr + zi * HWi + yi * Wi + xi;
                                     if (i + 8 <= CONV_NR && x0 + 8 <= W0 && xi + stride_w * 8 <= Wi)
@@ -564,10 +696,32 @@ void runFastConv(InputArray _input, OutputArray _output, const Ptr<FastConv>& co
                                                 float t2 = inptr_ki[2], t3 = inptr_ki[3];
                                                 float t4 = inptr_ki[4], t5 = inptr_ki[5];
                                                 float t6 = inptr_ki[6], t7 = inptr_ki[7];
-                                                inpbuf_ki[0] = t0; inpbuf_ki[1] = t1;
-                                                inpbuf_ki[2] = t2; inpbuf_ki[3] = t3;
-                                                inpbuf_ki[4] = t4; inpbuf_ki[5] = t5;
-                                                inpbuf_ki[6] = t6; inpbuf_ki[7] = t7;
+                                                inpbuf_ki[0] = t0;
+                                                inpbuf_ki[1] = t1;
+                                                inpbuf_ki[2] = t2;
+                                                inpbuf_ki[3] = t3;
+                                                inpbuf_ki[4] = t4;
+                                                inpbuf_ki[5] = t5;
+                                                inpbuf_ki[6] = t6;
+                                                inpbuf_ki[7] = t7;
+                                            }
+                                        }
+                                        else if (stride_w == 2)
+                                        {
+                                            for (int c = 0; c < Cg; c++, inpbuf_ki += CONV_NR, inptr_ki += inp_planesize)
+                                            {
+                                                float t0 = inptr_ki[0], t1 = inptr_ki[2];
+                                                float t2 = inptr_ki[4], t3 = inptr_ki[6];
+                                                float t4 = inptr_ki[8], t5 = inptr_ki[10];
+                                                float t6 = inptr_ki[12], t7 = inptr_ki[14];
+                                                inpbuf_ki[0] = t0;
+                                                inpbuf_ki[1] = t1;
+                                                inpbuf_ki[2] = t2;
+                                                inpbuf_ki[3] = t3;
+                                                inpbuf_ki[4] = t4;
+                                                inpbuf_ki[5] = t5;
+                                                inpbuf_ki[6] = t6;
+                                                inpbuf_ki[7] = t7;
                                             }
                                         }
                                         else
@@ -575,13 +729,17 @@ void runFastConv(InputArray _input, OutputArray _output, const Ptr<FastConv>& co
                                             for (int c = 0; c < Cg; c++, inpbuf_ki += CONV_NR, inptr_ki += inp_planesize)
                                             {
                                                 float t0 = inptr_ki[0], t1 = inptr_ki[stride_w];
-                                                float t2 = inptr_ki[stride_w*2], t3 = inptr_ki[stride_w*3];
-                                                float t4 = inptr_ki[stride_w*4], t5 = inptr_ki[stride_w*5];
-                                                float t6 = inptr_ki[stride_w*6], t7 = inptr_ki[stride_w*7];
-                                                inpbuf_ki[0] = t0; inpbuf_ki[1] = t1;
-                                                inpbuf_ki[2] = t2; inpbuf_ki[3] = t3;
-                                                inpbuf_ki[4] = t4; inpbuf_ki[5] = t5;
-                                                inpbuf_ki[6] = t6; inpbuf_ki[7] = t7;
+                                                float t2 = inptr_ki[stride_w * 2], t3 = inptr_ki[stride_w * 3];
+                                                float t4 = inptr_ki[stride_w * 4], t5 = inptr_ki[stride_w * 5];
+                                                float t6 = inptr_ki[stride_w * 6], t7 = inptr_ki[stride_w * 7];
+                                                inpbuf_ki[0] = t0;
+                                                inpbuf_ki[1] = t1;
+                                                inpbuf_ki[2] = t2;
+                                                inpbuf_ki[3] = t3;
+                                                inpbuf_ki[4] = t4;
+                                                inpbuf_ki[5] = t5;
+                                                inpbuf_ki[6] = t6;
+                                                inpbuf_ki[7] = t7;
                                             }
                                         }
                                         i += 8;
@@ -595,8 +753,10 @@ void runFastConv(InputArray _input, OutputArray _output, const Ptr<FastConv>& co
                                             {
                                                 float t0 = inptr_ki[0], t1 = inptr_ki[1];
                                                 float t2 = inptr_ki[2], t3 = inptr_ki[3];
-                                                inpbuf_ki[0] = t0; inpbuf_ki[1] = t1;
-                                                inpbuf_ki[2] = t2; inpbuf_ki[3] = t3;
+                                                inpbuf_ki[0] = t0;
+                                                inpbuf_ki[1] = t1;
+                                                inpbuf_ki[2] = t2;
+                                                inpbuf_ki[3] = t3;
                                             }
                                         }
                                         else
@@ -604,9 +764,11 @@ void runFastConv(InputArray _input, OutputArray _output, const Ptr<FastConv>& co
                                             for (int c = 0; c < Cg; c++, inpbuf_ki += CONV_NR, inptr_ki += inp_planesize)
                                             {
                                                 float t0 = inptr_ki[0], t1 = inptr_ki[stride_w];
-                                                float t2 = inptr_ki[stride_w*2], t3 = inptr_ki[stride_w*3];
-                                                inpbuf_ki[0] = t0; inpbuf_ki[1] = t1;
-                                                inpbuf_ki[2] = t2; inpbuf_ki[3] = t3;
+                                                float t2 = inptr_ki[stride_w * 2], t3 = inptr_ki[stride_w * 3];
+                                                inpbuf_ki[0] = t0;
+                                                inpbuf_ki[1] = t1;
+                                                inpbuf_ki[2] = t2;
+                                                inpbuf_ki[3] = t3;
                                             }
                                         }
                                         i += 4;
@@ -641,27 +803,30 @@ void runFastConv(InputArray _input, OutputArray _output, const Ptr<FastConv>& co
                 }
 
                 zyx0 = zyx0_saved;
+
                 // spacial branch for depth-wise convolution implemented using generic convolution.
                 // In this case, CONV_MR is 1, and CONV_NR is the same.
-                if (conv->conv_type == _FX_CONV_TYPE_DEPTHWISE_REMAIN)
-                {
-                    size_t outofs = (n*ngroups + g) * out_planesize + zyx0;
-                    float* cptr0 = cbuf_task;
-                    float* weights = conv->weightsBufPtr + g * padded_ksize;
+                if (conv->conv_type == _FX_CONV_TYPE_DEPTHWISE_REMAIN) {
+                    size_t outofs = (n * ngroups + g) * out_planesize + zyx0;
+                    float *cptr0 = cbuf_task;
+                    float *weights = conv->weightsBufPtr + g * padded_ksize;
                     int out_width = zyx_block_limit - zyx0;
-                    float* outptr = out + outofs;
+                    float *outptr = out + outofs;
                     const float biasVal = *(conv->biasBuf.data() + g);
-                    for (int stripe = 0; stripe < nstripes; stripe++)
-                    {
-                        const float* inptr = inpbuf_task + stripe*stripesize;
+                    for (int stripe = 0; stripe < nstripes; stripe++) {
+                        const float *inptr = inpbuf_task + stripe * stripesize;
                         const int outLen = out_width - stripe * CONV_NR;
                         bool ifBuffer = outLen < CONV_NR;
-                        float* cptr = outptr + stripe * CONV_NR;
-                        if (ifBuffer)
-                        {
+                        float *cptr = outptr + stripe * CONV_NR;
+                        if (ifBuffer) {
                             memcpy(cptr0, cptr, outLen * sizeof(cptr[0]));
                             cptr = cptr0;
                         }
+#if CV_TRY_AVX2
+                        if (conv->useAVX2)
+                                opt_AVX2::convBlockMR1(DkHkWkCg, weights, inptr, cptr, biasVal, fusedAdd, minval, maxval, ifMinMaxAct);
+                            else
+#endif
                         convBlockMR1(DkHkWkCg, weights, inptr, cptr, biasVal, fusedAdd, minval, maxval, ifMinMaxAct);
 
                         if (ifBuffer)
@@ -670,29 +835,25 @@ void runFastConv(InputArray _input, OutputArray _output, const Ptr<FastConv>& co
                         }
                     }
                     if (activ)
-                        activ->forwardSlice(outptr, outptr, out_width, out_planesize, g, g+1);
+                        activ->forwardSlice(outptr, outptr, out_width, out_planesize, g, g + 1);
                     continue;
                 }
 
-                float* weights = conv->weightsBufPtr + g * Kg_aligned * DkHkWkCg;
-                const float* biasptr = conv->biasBuf.data() + Kg * g;
+                float *weights = conv->weightsBufPtr + g * Kg_aligned * DkHkWkCg;
+                const float *biasptr = conv->biasBuf.data() + Kg * g;
                 int ldc = nstripes * CONV_NR;
 
                 // 2. do convolution, compute Kg x (zyx_block_limit - zyx0) part of the output tensor
-                for (int k0_block = k0; k0_block < k1; k0_block += K_BLOCK_SIZE)
-                {
+                for (int k0_block = k0; k0_block < k1; k0_block += K_BLOCK_SIZE) {
                     int k1_block = k0_block + K_BLOCK_SIZE < k1 ? k0_block + K_BLOCK_SIZE : k1;
-                    for (int c0 = 0; c0 < DkHkWkCg; c0 += C_BLOCK_SIZE)
-                    {
+                    for (int c0 = 0; c0 < DkHkWkCg; c0 += C_BLOCK_SIZE) {
                         int c1 = c0 + C_BLOCK_SIZE < DkHkWkCg ? c0 + C_BLOCK_SIZE : DkHkWkCg;
-                        for (int stripe = 0; stripe < nstripes; stripe++)
-                        {
-                            float* wptr = weights + k0_block*DkHkWkCg + c0*CONV_MR;
-                            const float* inptr = inpbuf_task + stripe*stripesize + c0 * CONV_NR;
-                            float* cptr = cbuf_task + stripe * CONV_NR;
+                        for (int stripe = 0; stripe < nstripes; stripe++) {
+                            float *wptr = weights + k0_block * DkHkWkCg + c0 * CONV_MR;
+                            const float *inptr = inpbuf_task + stripe * stripesize + c0 * CONV_NR;
+                            float *cptr = cbuf_task + stripe * CONV_NR;
                             for (int k = k0_block; k < k1_block; k += CONV_MR,
-                                    wptr += DkHkWkCg * CONV_MR, cptr += CONV_MR * ldc)
-                            {
+                                    wptr += DkHkWkCg * CONV_MR, cptr += CONV_MR * ldc) {
 #if CV_TRY_AVX2
                                 if (conv->useAVX2)
                                 opt_AVX2::convBlock_AVX2(c1 - c0, wptr, inptr, cptr, ldc, c0 == 0);
@@ -708,74 +869,71 @@ void runFastConv(InputArray _input, OutputArray _output, const Ptr<FastConv>& co
                         }
                     }
 
-                    size_t outofs = ((n*ngroups + g) * Kg + k0_block) * out_planesize + zyx0;
+                    size_t outofs = ((n * ngroups + g) * Kg + k0_block) * out_planesize + zyx0;
                     int out_width = zyx_block_limit - zyx0;
-                    const float* cptr = cbuf_task;
+                    const float *cptr = cbuf_task;
 
-                    float* outptr = out + outofs;
-                    const float* pbptr = fusedAddPtr0 ? fusedAddPtr0 + outofs : 0;
+                    float *outptr = out + outofs;
+                    const float *pbptr = fusedAddPtr0 ? fusedAddPtr0 + outofs : 0;
 
                     for (int k = k0_block; k < k1_block; k++,
                             cptr += ldc, outptr += out_planesize,
-                            pbptr += (pbptr ? out_planesize : 0))
-                    {
+                            pbptr += (pbptr ? out_planesize : 0)) {
                         float biasval = biasptr[k];
                         int j = 0;
 #if CV_SIMD128
-                        v_float32x4 vbias = v_setall_f32(biasval), vmax = v_setall_f32(maxval), vmin = v_setall_f32(minval);
-                    if (pbptr)
-                    {
-                        for (; j + 7 < out_width; j += 8)
-                        {
-                            v_float32x4 v0 = v_load(cptr + j) + vbias;
-                            v_float32x4 v1 = v_load(cptr + j + 4) + vbias;
+                        v_float32x4 vbias = v_setall_f32(biasval);
+                        v_float32x4 vmax = v_setall_f32(maxval);
+                        v_float32x4 vmin = v_setall_f32(minval);
 
-                            v0 += v_load(pbptr + j);
-                            v1 += v_load(pbptr + j + 4);
-
-                            if (ifMinMaxAct)
-                            {
-                                v0 = v_min(v_max(v0, vmin), vmax);
-                                v1 = v_min(v_max(v1, vmin), vmax);
-                            }
-
-                            v_store(outptr + j, v0);
-                            v_store(outptr + j + 4, v1);
-                        }
-                    }
-                    else
-                    {
-                        for (; j + 7 < out_width; j += 8)
-                        {
-                            v_float32x4 v0 = v_load(cptr + j) + vbias;
-                            v_float32x4 v1 = v_load(cptr + j + 4) + vbias;
-
-                            if (ifMinMaxAct)
-                            {
-                                v0 = v_min(v_max(v0, vmin), vmax);
-                                v1 = v_min(v_max(v1, vmin), vmax);
-                            }
-
-                            v_store(outptr + j, v0);
-                            v_store(outptr + j + 4, v1);
-                        }
-                    }
-#endif
                         if (pbptr)
                         {
-                            for (; j < out_width; j++)
+                            for (; j + 7 < out_width; j += 8)
                             {
+                                v_float32x4 v0 = v_load(cptr + j) + vbias;
+                                v_float32x4 v1 = v_load(cptr + j + 4) + vbias;
+
+                                v0 += v_load(pbptr + j);
+                                v1 += v_load(pbptr + j + 4);
+
+                                if (ifMinMaxAct)
+                                {
+                                    v0 = v_min(v_max(v0, vmin), vmax);
+                                    v1 = v_min(v_max(v1, vmin), vmax);
+                                }
+
+                                v_store(outptr + j, v0);
+                                v_store(outptr + j + 4, v1);
+                            }
+                        }
+                        else
+                        {
+                            for (; j + 7 < out_width; j += 8)
+                            {
+                                v_float32x4 v0 = v_load(cptr + j) + vbias;
+                                v_float32x4 v1 = v_load(cptr + j + 4) + vbias;
+
+                                if (ifMinMaxAct)
+                                {
+                                    v0 = v_min(v_max(v0, vmin), vmax);
+                                    v1 = v_min(v_max(v1, vmin), vmax);
+                                }
+
+                                v_store(outptr + j, v0);
+                                v_store(outptr + j + 4, v1);
+                            }
+                        }
+#endif
+                        if (pbptr) {
+                            for (; j < out_width; j++) {
                                 float v = cptr[j] + biasval;
                                 v += pbptr[j];
                                 if (ifMinMaxAct)
                                     v = std::min(std::max(v, minval), maxval);
                                 outptr[j] = v;
                             }
-                        }
-                        else
-                        {
-                            for (; j < out_width; j++)
-                            {
+                        } else {
+                            for (; j < out_width; j++) {
                                 float v = cptr[j] + biasval;
 
                                 if (ifMinMaxAct)

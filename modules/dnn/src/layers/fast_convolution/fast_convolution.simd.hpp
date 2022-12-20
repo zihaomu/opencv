@@ -22,7 +22,7 @@ void convBlockMR1(int np, const float* a, const float* b, float *c, const float 
 #if CONV_NR == 28
     v_float32x4 c6 = c0;
 #endif
-    for (int p = 0; p < np; p++, a++, b+= CONV_NR)
+    for (int p = 0; p < np; p++, a++, b += CONV_NR)
     {
         v_float32x4 a0 = v_setall_f32(a[0]);
         v_float32x4 b0 = v_load(b), b1 = v_load(b + 4), b2 = v_load(b + 8);

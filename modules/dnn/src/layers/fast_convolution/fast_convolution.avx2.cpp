@@ -10,6 +10,48 @@ namespace dnn {
 namespace opt_AVX2
 {
 #if CV_TRY_AVX2
+void convBlockMR1(int np, const float* a, const float* b, float *c, const float bias, bool init_c,
+          const float minval, const float maxval, bool ifMinMaxAct)
+{
+#if CONV_NR == 24
+    __m256 c0 = _mm256_set1_ps(bias), c1 = c0, c2 = c0;
+
+    for (int p = 0; p < np; p++, a++, b += CONV_NR)
+    {
+        __m256 a0 = _mm256_set1_ps(a[0]);
+        __m256 b0 = _mm256_loadu_ps(b), b1 = _mm256_loadu_ps(b + 8), b2 = _mm256_loadu_ps(b + 16);
+
+        c0 = _mm256_fmadd_ps(b0, a0, c0);
+        c1 = _mm256_fmadd_ps(b1, a0, c1);
+        c2 = _mm256_fmadd_ps(b2, a0, c2);
+    }
+
+    if (init_c)
+    {
+        c0 = _mm256_add_ps(_mm256_loadu_ps(c), c0);
+        c1 = _mm256_add_ps(_mm256_loadu_ps(c + 8), c1);
+        c2 = _mm256_add_ps(_mm256_loadu_ps(c + 16), c2);
+    }
+
+     if (ifMinMaxAct)
+    {
+        __m256 vmax = _mm256_set1_ps(maxval);
+        __m256 vmin = _mm256_set1_ps(minval);
+
+        c0 = _mm256_min_ps(_mm256_max_ps(c0, vmin), vmax);
+        c1 = _mm256_min_ps(_mm256_max_ps(c1, vmin), vmax);
+        c2 = _mm256_min_ps(_mm256_max_ps(c2, vmin), vmax);
+    }
+
+    _mm256_storeu_ps(c, c0);
+    _mm256_storeu_ps(c + 8, c1);
+    _mm256_storeu_ps(c + 16, c2);
+    _mm256_zeroupper();
+#else
+#error "unsupported CONV_NR in convBlockMR1."
+#endif
+}
+
 void convBlock_AVX2(int np, const float* a, const float* b, float* c, int ldc, bool init_c)
 {
 #if CONV_MR == 4 && CONV_NR == 24
