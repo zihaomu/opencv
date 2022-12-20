@@ -77,8 +77,12 @@ Ptr<FastConv> initFastConv(
     {
         if (conv_dim == CONV_1D)
         {
+#if CV_NEON
+            ifRunDepthWise = false;
+#else
             ifRunDepthWise &= Hk == 1 && Wk == 3 && (stride_w == 1 || (stride_w == 2 && dilation_w == 1))
                               && max(stride_w, dilation_w) >= conv->pad_left && conv->pad_left <= 1;
+#endif
         }
         else if (conv_dim == CONV_2D)
         {
@@ -267,6 +271,83 @@ Ptr<FastConv> initFastConv(
     return conv;
 }
 
+static void packData8(float*& inpbuf, float*& inptrIn, int& in_w, int& x0, int& s0, const int* ofstab,
+                      const int stride_w, const int ksize)
+{
+    float* inpbufC = inpbuf + s0;
+    float* inptrInC = inptrIn;
+
+    if (stride_w == 1)
+        for (int k = 0; k < ksize; k++)
+        {
+            int k1 = ofstab[k];
+            float v0 = inptrInC[k1];
+            float v1 = inptrInC[k1 + 1];
+            float v2 = inptrInC[k1 + 2];
+            float v3 = inptrInC[k1 + 3];
+            float v4 = inptrInC[k1 + 4];
+            float v5 = inptrInC[k1 + 5];
+            float v6 = inptrInC[k1 + 6];
+            float v7 = inptrInC[k1 + 7];
+
+            inpbufC[k*CONV_NR] = v0;
+            inpbufC[k*CONV_NR+1] = v1;
+            inpbufC[k*CONV_NR+2] = v2;
+            inpbufC[k*CONV_NR+3] = v3;
+            inpbufC[k*CONV_NR+4] = v4;
+            inpbufC[k*CONV_NR+5] = v5;
+            inpbufC[k*CONV_NR+6] = v6;
+            inpbufC[k*CONV_NR+7] = v7;
+        }
+    else
+        for (int k = 0; k < ksize; k++)
+        {
+            int k1 = ofstab[k];
+            float v0 = inptrInC[k1];
+            float v1 = inptrInC[k1 + stride_w];
+            float v2 = inptrInC[k1 + 2*stride_w];
+            float v3 = inptrInC[k1 + 3*stride_w];
+            float v4 = inptrInC[k1 + 4*stride_w];
+            float v5 = inptrInC[k1 + 5*stride_w];
+            float v6 = inptrInC[k1 + 6*stride_w];
+            float v7 = inptrInC[k1 + 7*stride_w];
+
+            inpbufC[k*CONV_NR] = v0;
+            inpbufC[k*CONV_NR+1] = v1;
+            inpbufC[k*CONV_NR+2] = v2;
+            inpbufC[k*CONV_NR+3] = v3;
+            inpbufC[k*CONV_NR+4] = v4;
+            inpbufC[k*CONV_NR+5] = v5;
+            inpbufC[k*CONV_NR+6] = v6;
+            inpbufC[k*CONV_NR+7] = v7;
+        }
+    x0+=7;
+    s0+=7;
+    inptrIn += 7*stride_w;
+    in_w += 7*stride_w;
+}
+
+static void packData2(float*& inpbuf, float*& inptrIn, int& in_w, int& x0, int& s0, const int* ofstab,
+                      const int stride_w, const int ksize)
+{
+    float* inpbufC = inpbuf + s0;
+    float* inptrInC = inptrIn;
+
+    for (int k = 0; k < ksize; k++)
+    {
+        int k1 = ofstab[k];
+        float v0 = inptrInC[k1];
+        float v1 = inptrInC[k1 + stride_w];
+        inpbufC[k*CONV_NR] = v0;
+        inpbufC[k*CONV_NR+1] = v1;
+    }
+
+    x0++;
+    s0++;
+    inptrIn += stride_w;
+    in_w += stride_w;
+}
+
 void runFastConv(InputArray _input, OutputArray _output, const Ptr<FastConv>& conv, int ntasks,
                    const Ptr<ActivationLayer>& actLayer, const std::vector<float>& reluslope, bool fusedAdd)
 {
@@ -417,7 +498,7 @@ void runFastConv(InputArray _input, OutputArray _output, const Ptr<FastConv>& co
             }
     }
 
-    int MAX_STRIPES = 32; // (56 + CONV_NR - 1)/CONV_NR;
+    int MAX_STRIPES = (56 + CONV_NR - 1)/CONV_NR;
 
     // Friendly to L1 cache
     const int K_BLOCK_SIZE = conv->conv_type == _FX_CONV_TYPE_DEPTHWISE_REMAIN ? 1 : 32;
@@ -435,7 +516,8 @@ void runFastConv(InputArray _input, OutputArray _output, const Ptr<FastConv>& co
     else
         Kg_nblocks = 1;
 
-    bool bigKernelDepthPack = conv->conv_type == _FX_CONV_TYPE_DEPTHWISE_REMAIN && ksize > 25; // Spacial data pack branch for big kernel depth-wise.
+    // Spacial data pack branch for big kernel depth-wise.
+    bool bigKernelDepthPack = conv->conv_type == _FX_CONV_TYPE_DEPTHWISE_REMAIN && (conv_dim == CONV_3D || conv_dim == CONV_1D);
 
     int Kstripes = Kg_nblocks*stripes_per_sample;
     int nsubtasks = N*ngroups*Kstripes;
@@ -539,7 +621,6 @@ void runFastConv(InputArray _input, OutputArray _output, const Ptr<FastConv>& co
                     else if (bigKernelDepthPack)
                     {
                         CV_Assert(Cg == 1);
-                        const int CONV_NRCg = CONV_NR * Cg;
                         const int HW0 = H0 * W0;
                         const int HWi = Hi * Wi;
                         int slice_len = std::min(zyx_block_limit - zyx0, CONV_NR);
@@ -553,7 +634,64 @@ void runFastConv(InputArray _input, OutputArray _output, const Ptr<FastConv>& co
                         int z0 = zyx0 / HW0, yx0 = zyx0 - z0 * HW0;
                         int y0 = yx0 / W0, x0 = yx0 - y0 * W0;
 
-                        if (conv_dim == CONV_1D || conv_dim == CONV_2D)
+                        if (conv_dim == CONV_1D)
+                        {
+                            for (int slice_i = 0; slice_i < slice_len; y0++, x0=0)
+                            {
+                                int delta = std::min(slice_len - slice_i, W0 - x0);
+                                int x1 = x0 + delta;
+
+                                int in_w = x0 * stride_w - pad_left;
+                                float* inptrIn = inptr + in_w;
+
+                                int s0 = slice_i;
+
+                                for (; x0 < x1; x0++, s0++, inptrIn += stride_w, in_w += stride_w)
+                                {
+                                    // Pack 8
+                                    if (x0 + 8 <= x1 && 0 <= in_w &&
+                                        in_w + stride_w*8 <= Wi - (Wk-1)*dilation_w)
+                                    {
+                                        packData8(inpbuf, inptrIn, in_w, x0, s0, ofstab, stride_w,ksize);
+                                    }
+                                    else if (x0 + 2 <= x1 && 0 <= in_w &&
+                                        in_w + stride_w*2 <= Wi - (Wk-1)*dilation_w)
+                                    {
+                                        float* inpbufC = inpbuf + s0;
+                                        float* inptrInC = inptrIn;
+
+                                        for (int k = 0; k < ksize; k++)
+                                        {
+                                            int k1 = ofstab[k];
+                                            float v0 = inptrInC[k1];
+                                            float v1 = inptrInC[k1 + stride_w];
+                                            inpbufC[k*CONV_NR] = v0;
+                                            inpbufC[k*CONV_NR+1] = v1;
+                                        }
+
+                                        x0++;
+                                        s0++;
+                                        inptrIn += stride_w;
+                                        in_w += stride_w;
+                                    }
+                                    else
+                                    {
+                                        int w0 = std::max(0, (-in_w + dilation_w-1)/dilation_w);
+                                        int w1 = std::min(Wk, (Wi - in_w + dilation_w-1)/dilation_w);
+
+                                        float* inpbufC = inpbuf + s0;
+                                        float* inptrInC = inptrIn;
+                                        for (int w = w0; w < w1; w++)
+                                        {
+                                            int imgofs = w*dilation_w;
+                                            inpbufC[w*CONV_NR] = inptrInC[imgofs];
+                                        }
+                                    }
+                                }
+                                slice_i += delta;
+                            }
+                        }
+                        if (conv_dim == CONV_2D)
                         {
                             for (int slice_i = 0; slice_i < slice_len; y0++, x0=0)
                             {
@@ -570,28 +708,18 @@ void runFastConv(InputArray _input, OutputArray _output, const Ptr<FastConv>& co
                                 int h1 = std::min(Hk, (Hi - in_h + dilation_h-1)/dilation_h);
 
                                 int s0 = slice_i;
-
                                 for (; x0 < x1; x0++, s0++, inptrIn += stride_w, in_w += stride_w)
                                 {
-                                    if (ok_i && x0 + 2 <= x1 && 0 <= in_w &&
+                                    // Pack 8
+                                    if (ok_i && x0 + 8 <= x1 && 0 <= in_w &&
+                                        in_w + stride_w*8 <= Wi - (Wk-1)*dilation_w)
+                                    {
+                                        packData8(inpbuf, inptrIn, in_w, x0, s0, ofstab, stride_w,ksize);
+                                    }
+                                    else if (ok_i && x0 + 2 <= x1 && 0 <= in_w &&
                                             in_w + stride_w*2 <= Wi - (Wk-1)*dilation_w)
                                     {
-                                        float* inpbufC = inpbuf + s0;
-                                        float* inptrInC = inptrIn;
-
-                                        for (int k = 0; k < ksize; k++)
-                                        {
-                                            int k1 = ofstab[k];
-                                            float v0 = inptrInC[k1];
-                                            float v1 = inptrInC[k1 + stride_w];
-                                            inpbufC[k*CONV_NRCg] = v0;
-                                            inpbufC[k*CONV_NRCg+1] = v1;
-                                        }
-
-                                        x0++;
-                                        s0++;
-                                        inptrIn += stride_w;
-                                        in_w += stride_w;
+                                        packData2(inpbuf, inptrIn, in_w, x0, s0, ofstab, stride_w,ksize);
                                     }
                                     else
                                     {
@@ -606,7 +734,7 @@ void runFastConv(InputArray _input, OutputArray _output, const Ptr<FastConv>& co
                                             for (int w = w0; w < w1; w++)
                                             {
                                                 int imgofs = h*(dilation_h*Wi) + w*dilation_w;
-                                                inpbufC[(h*Wk + w)*CONV_NRCg] = inptrInC[imgofs];
+                                                inpbufC[(h*Wk + w)*CONV_NR] = inptrInC[imgofs];
                                             }
                                         }
                                     }
@@ -630,26 +758,41 @@ void runFastConv(InputArray _input, OutputArray _output, const Ptr<FastConv>& co
                                 int d0 = std::max(0, (-in_d + dilation_d - 1) / dilation_d);
                                 int d1 = std::min(Dk, (Di - in_d + dilation_d - 1) / dilation_d);
 
+                                bool ok_i = 0 <= in_h && in_h < Hi - (Hk-1)*dilation_h;
                                 int h0 = std::max(0, (-in_h + dilation_h-1)/dilation_h);
                                 int h1 = std::min(Hk, (Hi - in_h + dilation_h-1)/dilation_h);
 
                                 int s0 = slice_i;
                                 for (; x0 < x1; x0++, s0++, inptrIn += stride_w, in_w += stride_w)
                                 {
-                                    int w0 = std::max(0, (-in_w + dilation_w-1)/dilation_w);
-                                    int w1 = std::min(Wk, (Wi - in_w + dilation_w-1)/dilation_w);
-
-                                    float* inpbufC = inpbuf + s0;
-                                    float* inptrInC = inptrIn;
-
-                                    for ( int d = d0; d < d1; d++)
+                                    // Pack 8
+                                    if (ok_i && x0 + 8 <= x1 && 0 <= in_w &&
+                                        in_w + stride_w*8 <= Wi - (Wk-1)*dilation_w)
                                     {
-                                        for (int h = h0; h < h1; h++)
+                                        packData8(inpbuf, inptrIn, in_w, x0, s0, ofstab, stride_w,ksize);
+                                    }
+                                    else if (ok_i && x0 + 2 <= x1 && 0 <= in_w &&
+                                        in_w + stride_w*2 <= Wi - (Wk-1)*dilation_w)
+                                    {
+                                        packData2(inpbuf, inptrIn, in_w, x0, s0, ofstab, stride_w,ksize);
+                                    }
+                                    else
+                                    {
+                                        int w0 = std::max(0, (-in_w + dilation_w-1)/dilation_w);
+                                        int w1 = std::min(Wk, (Wi - in_w + dilation_w-1)/dilation_w);
+
+                                        float* inpbufC = inpbuf + s0;
+                                        float* inptrInC = inptrIn;
+
+                                        for ( int d = d0; d < d1; d++)
                                         {
-                                            for (int w = w0; w < w1; w++)
+                                            for (int h = h0; h < h1; h++)
                                             {
-                                                int imgofs = d*dilation_d*HWi + h*(dilation_h*Wi) + w*dilation_w;
-                                                inpbufC[((d*Hk + h)*Wk + w)*CONV_NRCg] = inptrInC[imgofs];
+                                                for (int w = w0; w < w1; w++)
+                                                {
+                                                    int imgofs = d*dilation_d*HWi + h*(dilation_h*Wi) + w*dilation_w;
+                                                    inpbufC[((d*Hk + h)*Wk + w)*CONV_NR] = inptrInC[imgofs];
+                                                }
                                             }
                                         }
                                     }
@@ -799,28 +942,31 @@ void runFastConv(InputArray _input, OutputArray _output, const Ptr<FastConv>& co
 
                 // spacial branch for depth-wise convolution implemented using generic convolution.
                 // In this case, CONV_MR is 1, and CONV_NR is the same.
-                if (conv->conv_type == _FX_CONV_TYPE_DEPTHWISE_REMAIN) {
+                if (conv->conv_type == _FX_CONV_TYPE_DEPTHWISE_REMAIN)
+                {
                     size_t outofs = (n * ngroups + g) * out_planesize + zyx0;
                     float *cptr0 = cbuf_task;
                     float *weights = conv->weightsBufPtr + g * padded_ksize;
                     int out_width = zyx_block_limit - zyx0;
                     float *outptr = out + outofs;
                     const float biasVal = *(conv->biasBuf.data() + g);
-                    for (int stripe = 0; stripe < nstripes; stripe++) {
+                    for (int stripe = 0; stripe < nstripes; stripe++)
+                    {
                         const float *inptr = inpbuf_task + stripe * stripesize;
-                        const int outLen = out_width - stripe * CONV_NR;
+                        const int outLen = std::min(out_width - stripe * CONV_NR, CONV_NR);
                         bool ifBuffer = outLen < CONV_NR;
                         float *cptr = outptr + stripe * CONV_NR;
-                        if (ifBuffer) {
+                        if (ifBuffer)
+                        {
                             memcpy(cptr0, cptr, outLen * sizeof(cptr[0]));
                             cptr = cptr0;
                         }
 #if CV_TRY_AVX2
-                        if (conv->useAVX2)
+                        if (conv->useAVX2 && outLen > CONV_NR/3)
                                 opt_AVX2::convBlockMR1(DkHkWkCg, weights, inptr, cptr, biasVal, fusedAdd, minval, maxval, ifMinMaxAct);
-                            else
+                        else
 #endif
-                        convBlockMR1(DkHkWkCg, weights, inptr, cptr, biasVal, fusedAdd, minval, maxval, ifMinMaxAct);
+                        convBlockMR1(DkHkWkCg, weights, inptr, cptr, biasVal, fusedAdd, minval, maxval, ifMinMaxAct, outLen);
 
                         if (ifBuffer)
                         {
@@ -837,33 +983,44 @@ void runFastConv(InputArray _input, OutputArray _output, const Ptr<FastConv>& co
                 int ldc = nstripes * CONV_NR;
 
                 // 2. do convolution, compute Kg x (zyx_block_limit - zyx0) part of the output tensor
-                for (int k0_block = k0; k0_block < k1; k0_block += K_BLOCK_SIZE) {
+                int out_width = zyx_block_limit - zyx0;
+                for (int k0_block = k0; k0_block < k1; k0_block += K_BLOCK_SIZE)
+                {
                     int k1_block = k0_block + K_BLOCK_SIZE < k1 ? k0_block + K_BLOCK_SIZE : k1;
-                    for (int c0 = 0; c0 < DkHkWkCg; c0 += C_BLOCK_SIZE) {
+                    for (int c0 = 0; c0 < DkHkWkCg; c0 += C_BLOCK_SIZE)
+                    {
                         int c1 = c0 + C_BLOCK_SIZE < DkHkWkCg ? c0 + C_BLOCK_SIZE : DkHkWkCg;
-                        for (int stripe = 0; stripe < nstripes; stripe++) {
+                        for (int stripe = 0; stripe < nstripes; stripe++)
+                        {
+                            const int outLen = std::min(out_width - stripe * CONV_NR, CONV_NR);
+
+#if CV_TRY_AVX2 || CV_TRY_NEON
+                            // The possible CONV_NR is 28, 24, 12, so the possible CONV_NR/3 is 9, 8, 4.
+                            bool runOpt = outLen > std::min(8, CONV_NR/3);
+#endif
                             float *wptr = weights + k0_block * DkHkWkCg + c0 * CONV_MR;
                             const float *inptr = inpbuf_task + stripe * stripesize + c0 * CONV_NR;
                             float *cptr = cbuf_task + stripe * CONV_NR;
                             for (int k = k0_block; k < k1_block; k += CONV_MR,
-                                    wptr += DkHkWkCg * CONV_MR, cptr += CONV_MR * ldc) {
+                                    wptr += DkHkWkCg * CONV_MR, cptr += CONV_MR * ldc)
+                            {
 #if CV_TRY_AVX2
-                                if (conv->useAVX2)
-                                opt_AVX2::convBlock_AVX2(c1 - c0, wptr, inptr, cptr, ldc, c0 == 0);
-                            else
+                                if (conv->useAVX2 && runOpt)
+                                    opt_AVX2::convBlock_AVX2(c1 - c0, wptr, inptr, cptr, ldc, c0 == 0);
+                                else
 #endif
 #if CV_TRY_NEON
-                                if (conv->useNEON)
-                                opt_NEON::convBlock_NEON(c1 - c0, wptr, inptr, cptr, ldc, c0 == 0);
-                            else
+                                if (conv->useNEON && runOpt)
+                                    opt_NEON::convBlock_NEON(c1 - c0, wptr, inptr, cptr, ldc, c0 == 0);
+                                else
 #endif
-                                convBlock(c1 - c0, wptr, inptr, cptr, ldc, c0 == 0);
+                                // The possible outLen range is 24 or 8~1.
+                                convBlock(c1 - c0, wptr, inptr, cptr, ldc, c0 == 0, outLen);
                             }
                         }
                     }
 
                     size_t outofs = ((n * ngroups + g) * Kg + k0_block) * out_planesize + zyx0;
-                    int out_width = zyx_block_limit - zyx0;
                     const float *cptr = cbuf_task;
 
                     float *outptr = out + outofs;
