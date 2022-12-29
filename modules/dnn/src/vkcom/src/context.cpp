@@ -9,6 +9,7 @@
 #include "../vulkan/vk_loader.hpp"
 #include "common.hpp"
 #include "context.hpp"
+#include <vulkan/vulkan.h>
 
 namespace cv { namespace dnn { namespace vkcom {
 
@@ -111,21 +112,33 @@ bool isAvailable()
 
 Context::Context()
 {
-    if(!loadVulkanLibrary())
-    {
-        CV_Error(Error::StsError, "loadVulkanLibrary failed");
-        return;
-    }
-    else if (!loadVulkanEntry())
-    {
-        CV_Error(Error::StsError, "loadVulkanEntry failed");
-        return;
-    }
-    else if (!loadVulkanGlobalFunctions())
-    {
-        CV_Error(Error::StsError, "loadVulkanGlobalFunctions failed");
-        return;
-    }
+//        VkInstanceCreateInfo createInfo = {};
+//        if (vkCreateInstance(&createInfo, nullptr, &kInstance) != VK_SUCCESS)
+//        {
+//            std::cout<<"failed to create instance!"<<std::endl;
+////            return 0;
+//        }
+//        else
+//        {
+//            std::cout<<"create instance successfully!"<<std::endl;
+////            return 1;
+//        }
+
+//    if(!loadVulkanLibrary())
+//    {
+//        CV_Error(Error::StsError, "loadVulkanLibrary failed");
+//        return;
+//    }
+//    else if (!loadVulkanEntry())
+//    {
+//        CV_Error(Error::StsError, "loadVulkanEntry failed");
+//        return;
+//    }
+//    else if (!loadVulkanGlobalFunctions())
+//    {
+//        CV_Error(Error::StsError, "loadVulkanGlobalFunctions failed");
+//        return;
+//    }
 
     // create VkInstance, VkPhysicalDevice
     std::vector<const char *> enabledExtensions;
@@ -172,6 +185,7 @@ Context::Context()
         if (!foundExtension) {
             throw std::runtime_error("Extension VK_EXT_DEBUG_REPORT_EXTENSION_NAME not supported\n");
         }
+
         enabledExtensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
     }
 

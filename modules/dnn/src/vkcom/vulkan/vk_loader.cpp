@@ -21,22 +21,22 @@ typedef HMODULE VulkanHandle;
         (PFN_vkGetInstanceProcAddr)GetProcAddress(handle, "vkGetInstanceProcAddr");
 #endif // _WIN32
 
-#if defined(__linux__)
-#include <dlfcn.h>
-#include <stdio.h>
+#if 1//defined(__linux__)
+//#include <dlfcn.h>
+//#include <stdio.h>
 typedef void* VulkanHandle;
-#define DEFAULT_VK_LIBRARY_PATH "libvulkan.so.1"
-#define LOAD_VK_LIBRARY(path) dlopen(path, RTLD_LAZY | RTLD_GLOBAL)
-#define FREE_VK_LIBRARY(handle) dlclose(handle)
+//#define DEFAULT_VK_LIBRARY_PATH "libvulkan.so.1"
+//#define LOAD_VK_LIBRARY(path) dlopen(path, RTLD_LAZY | RTLD_GLOBAL)
+//#define FREE_VK_LIBRARY(handle) dlclose(handle)
 #define GET_VK_ENTRY_POINT(handle) \
         (PFN_vkGetInstanceProcAddr)dlsym(handle, "vkGetInstanceProcAddr");
-#endif // __linux__
+//#endif // __linux__
 
-#ifndef DEFAULT_VK_LIBRARY_PATH
-#define DEFAULT_VK_LIBRARY_PATH ""
-#define LOAD_VK_LIBRARY(path) nullptr
-#define FREE_VK_LIBRARY(handle)
-#define GET_VK_ENTRY_POINT(handle) nullptr
+//#ifndef DEFAULT_VK_LIBRARY_PATH
+//#define DEFAULT_VK_LIBRARY_PATH ""
+//#define LOAD_VK_LIBRARY(path) nullptr
+//#define FREE_VK_LIBRARY(handle)
+//#define GET_VK_ENTRY_POINT(handle) nullptr
 #endif
 
 namespace cv { namespace dnn { namespace vkcom {
@@ -83,12 +83,12 @@ bool loadVulkanEntry()
     if (handle == nullptr)
         return false;
 
-    vkGetInstanceProcAddr = GET_VK_ENTRY_POINT(handle);
-    if (!vkGetInstanceProcAddr)
-    {
-        fprintf(stderr, "Could not load Vulkan entry function: vkGetInstanceProcAddr!\n");
-        return false;
-    }
+//    vkGetInstanceProcAddr = GET_VK_ENTRY_POINT(handle);
+//    if (!vkGetInstanceProcAddr)
+//    {
+//        fprintf(stderr, "Could not load Vulkan entry function: vkGetInstanceProcAddr!\n");
+//        return false;
+//    }
 
     return true;
 }
@@ -98,23 +98,23 @@ bool loadVulkanLibrary()
     if (handle != nullptr)
         return true;
 
-    const char* path;
-    const char* envPath = getenv("OPENCV_VULKAN_RUNTIME");
-    if (envPath)
-    {
-        path = envPath;
-    }
-    else
-    {
-        path = DEFAULT_VK_LIBRARY_PATH;
-    }
-
-    handle = LOAD_VK_LIBRARY(path);
-    if( handle == nullptr )
-    {
-        fprintf(stderr, "Could not load Vulkan library: %s!\n", path);
-        return false;
-    }
+//    const char* path;
+//    const char* envPath = getenv("OPENCV_VULKAN_RUNTIME");
+//    if (envPath)
+//    {
+//        path = envPath;
+//    }
+//    else
+//    {
+//        path = DEFAULT_VK_LIBRARY_PATH;
+//    }
+//
+//    handle = LOAD_VK_LIBRARY(path);
+//    if( handle == nullptr )
+//    {
+//        fprintf(stderr, "Could not load Vulkan library: %s!\n", path);
+//        return false;
+//    }
 
     return true;
 }
