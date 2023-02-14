@@ -26,6 +26,8 @@
 #include "../include/vkcom.hpp"
 #include "../shader/spv_shader.hpp"
 
+#include "../../include/opencv2/dnn/dnn.hpp"
+
 namespace cv { namespace dnn { namespace vkcom {
 
 #ifdef HAVE_VULKAN

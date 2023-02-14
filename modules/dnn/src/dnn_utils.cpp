@@ -11,6 +11,89 @@ namespace cv {
 namespace dnn {
 CV__DNN_INLINE_NS_BEGIN
 
+void printShape(InputArray blob_)
+{
+    Mat blob = blob_.getMat();
+    auto shapeA = shape(blob);
+    for (int i = 0; i < shapeA.size(); i++)
+    {
+        std::cout<<"x"<<shapeA[i];
+    }
+    std::cout<<std::endl;
+}
+
+void printblob(InputArray blob_, int strip)
+{
+    Mat blob = blob_.getMat();
+    auto shapeV = shape(blob);
+    auto typeMat = blob.type();
+    std::cout << "data type = " << typeMat << std::endl;
+    float *ptrf;
+    uchar *ptru;
+    char *ptrc;
+    int* ptrs;
+    int len = std::min(int(blob.total()), 1000);
+    if (strip > 0)
+    {
+        if (typeMat == 0) {
+            ptru = (uchar *) blob.data;
+            for (int i = 0; i < len; i++) {
+                std::cout << (int) *(ptru + i) << ", ";
+                if ((i+1)%strip == 0)
+                    std::cout <<std::endl;
+            }
+        }else if (typeMat == 1) {
+            ptrc = (char *)blob.data;
+            for(int i = 0; i<len; i++) {
+                std::cout<<(int) *(ptrc + i)<<", ";
+                if ((i+1)%strip == 0)
+                    std::cout <<std::endl;}
+
+        }else if (typeMat == 4) {
+            ptrs = (int *)blob.data;
+            for(int i = 0; i<len; i++) {
+                std::cout<<(int) *(ptrs + i)<<", ";
+                if ((i+1)%strip == 0)
+                    std::cout <<std::endl;}
+
+        }
+        else if (typeMat == 5) {
+            ptrf = (float *)blob.data;
+            for(int i = 0; i<len; i++) {
+                std::cout<<*(ptrf + i)<<", ";
+                if ((i+1)%strip == 0)
+                    std::cout <<std::endl;
+            }
+        }
+    }
+    else
+    {
+        if (typeMat == 0) {
+            ptru = (uchar *) blob.data;
+            for (int i = 0; i < len; i++) {
+                std::cout << (int) *(ptru + i) << ", ";
+            }
+        }else if (typeMat == 1) {
+            ptrc = (char *)blob.data;
+            for(int i = 0; i<len; i++) {
+                std::cout<<(int) *(ptrc + i)<<", ";}
+
+        }else if (typeMat == 4) {
+            ptrs = (int *)blob.data;
+            for(int i = 0; i<len; i++) {
+                std::cout<<(int) *(ptrs + i)<<", ";}
+
+        }
+        else if (typeMat == 5) {
+            ptrf = (float *)blob.data;
+            for(int i = 0; i<len; i++) {
+                std::cout<<*(ptrf + i)<<", ";
+            }
+        }
+    }
+
+    std::cout<<std::endl;
+}
 
 Mat blobFromImage(InputArray image, double scalefactor, const Size& size,
         const Scalar& mean, bool swapRB, bool crop, int ddepth)

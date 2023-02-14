@@ -1,0 +1,60 @@
+#version 450
+
+layout(binding = 0) readonly buffer Input0{
+    vec4 image_data[];
+};
+layout(binding = 1) readonly buffer Input1 {
+    float bias_data[];
+};
+layout(binding = 2) readonly buffer Input3{
+    float weight_data[];
+};
+layout(binding = 3) writeonly buffer Output{
+    float convolved_image_data[];
+};
+
+layout(push_constant) uniform pushBlock {
+    int in_h;
+    int in_w;
+    int out_h;
+    int out_w;
+    int stride_h;
+    int stride_w;
+    int pad_h;
+    int pad_w;
+    int filter_h;
+    int filter_w;
+    int dilation_h;
+    int dilation_w;
+    int channels;
+    int batch;
+    int has_bias;
+    int M;
+    int K;
+    int N;
+    int basic_shader_batch_idx;      // what's this ？
+    int basic_shader_partition_idx;  //
+    int basic_shader_partition_size; // what's this？
+} p;
+
+void main()
+{
+    int gx = int(gl_GlobalInvocationID.x);
+    mat4 m4 = mat4(image_data[0], image_data[1], image_data[2], image_data[3]);
+
+#define STORE_VEC4_TO_FLOAT(offset, dataVec4) \
+    convolved_image_data[offset] = dataVec4.x; \
+    convolved_image_data[offset + 1] = dataVec4.y; \
+    convolved_image_data[offset + 2] = dataVec4.z; \
+    convolved_image_data[offset + 3] = dataVec4.w
+
+    STORE_VEC4_TO_FLOAT(0, vec4(m4[0][0], m4[1][0], m4[2][0], m4[3][0]));
+//    convolved_image_data[0] = vec4(m4[0][0], m4[1][0], m4[2][0], m4[3][0]);
+//    convolved_image_data[1] = bias_data[1];
+//    convolved_image_data[2] = weight_data[1];
+//    for (int i = 0; i < 1000; i++)
+//    {
+////        convolved_image_data[i] = float(i);
+//        convolved_image_data[i] = image_data[i];
+//    }
+}

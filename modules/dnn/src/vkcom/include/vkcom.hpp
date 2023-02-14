@@ -24,6 +24,7 @@ enum Format{
 };
 
 enum OpType {
+    kOpTypeNull = -1,
     kOpTypeConv,
     kOpTypePool,
     kOpTypeDWConv,
@@ -33,10 +34,16 @@ enum OpType {
     kOpTypeReLU,
     kOpTypePriorBox,
     kOpTypePermute,
-    kOpTypeNum
+    kOpTypeConvInternel,
 };
-enum PaddingMode { kPaddingModeSame, kPaddingModeValid, kPaddingModeCaffe, kPaddingModeNum };
-enum FusedActivationType { kNone, kRelu, kRelu1, kRelu6, kActivationNum };
+enum PaddingMode { kPaddingModeSame = -1, kPaddingModeValid, kPaddingModeCaffe, kPaddingModeNum };
+
+enum FusedActivationType {
+    kFusedActivUnsupport = -1,
+    kFusedActivNone = 0,
+    kFusedActivRelu = 1,
+    kFusedActivRelu6 = 2,
+};
 typedef std::vector<int> Shape;
 
 bool isAvailable();
@@ -48,13 +55,13 @@ bool isAvailable();
 #include "tensor.hpp"
 #include "buffer.hpp"
 #include "op_base.hpp"
-#include "op_concat.hpp"
+//#include "op_concat.hpp"
 #include "op_conv.hpp"
-#include "op_lrn.hpp"
-#include "op_softmax.hpp"
-#include "op_relu.hpp"
-#include "op_pool.hpp"
-#include "op_prior_box.hpp"
-#include "op_permute.hpp"
+//#include "op_lrn.hpp"
+//#include "op_softmax.hpp"
+//#include "op_relu.hpp"
+//#include "op_pool.hpp"
+//#include "op_prior_box.hpp"
+//#include "op_permute.hpp"
 
 #endif // OPENCV_DNN_VKCOM_HPP

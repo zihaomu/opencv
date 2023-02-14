@@ -50,7 +50,7 @@ Ptr<BackendNode> Layer::initCUDA(
     return Ptr<BackendNode>();
 }
 
-Ptr<BackendNode> Layer::initVkCom(const std::vector<Ptr<BackendWrapper>>&)
+Ptr<BackendNode> Layer::initVkCom(const std::vector<Ptr<BackendWrapper> > &inputs, std::vector<Ptr<BackendWrapper> > &outputs)
 {
     CV_Error(Error::StsNotImplemented, "VkCom pipeline of " + type + " layers is not defined.");
     return Ptr<BackendNode>();
@@ -257,6 +257,24 @@ bool Layer::getMemoryShapes(const std::vector<MatShape>& inputs,
 bool Layer::updateMemoryShapes(const std::vector<MatShape>& inputs)
 {
     return true;
+}
+
+TickMeter Layer::t0 = TickMeter();
+TickMeter Layer::t1 = TickMeter();
+TickMeter Layer::t2 = TickMeter();
+TickMeter Layer::t3 = TickMeter();
+TickMeter Layer::t4 = TickMeter();
+
+void Layer::printTime()
+{
+    std::cout<<"t0 = "<<t0.getTimeMilli()<<",t1 = "<<t1.getTimeMilli()<<",t2 = "<<t2.getTimeMilli()<<",t3 = "<<t3.getTimeMilli()<<",t4 = "<<t4.getTimeMilli()<<std::endl;
+}
+void Layer::resetTime()
+{
+    t0.reset();
+    t1.reset();
+    t2.reset();
+    t3.reset();
 }
 
 CV__DNN_INLINE_NS_END

@@ -35,6 +35,8 @@ if sys.platform.find('win32') != -1:
 elif sys.platform.find('linux') != -1:
     cmd_remove = 'rm'
     null_out = ' > /dev/null 2>&1'
+else:
+    cmd_remove = 'rm'
 
 list = os.listdir(dir)
 for i in range(0, len(list)):
@@ -46,13 +48,13 @@ for i in range(0, len(list)):
 
     bin_file = prefix + '.tmp'
     cmd = ' glslangValidator -V ' + path + ' -S comp -o ' + bin_file
-    print('compiling')
+    print('Run cmd = ', cmd)
     if os.system(cmd) != 0:
         continue;
     size = os.path.getsize(bin_file)
 
     spv_txt_file = prefix + '.spv'
-    cmd = 'glslangValidator -V ' + path + ' -S comp -o ' + spv_txt_file + ' -x' + null_out
+    cmd = 'glslangValidator -V ' + path + ' -S comp -o ' + spv_txt_file  + ' -x' #+ null_out
     os.system(cmd)
 
     infile_name = spv_txt_file

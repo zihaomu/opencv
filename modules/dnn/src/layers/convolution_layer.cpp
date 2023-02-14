@@ -82,7 +82,7 @@ namespace dnn
 class BaseConvolutionLayerImpl : public ConvolutionLayer
 {
 public:
-    bool fusedWeights, fusedBias;
+    bool fusedWeights, fusedBias, variableWeight;
     std::vector<double> weightsMultipliers;
 #ifdef HAVE_WEBNN
     int groups;
@@ -116,6 +116,9 @@ public:
 
         fusedWeights = false;
         fusedBias = false;
+
+        // When blobs is empty, this layer should have variableWeight.
+        variableWeight = blobs.empty();
 
         if (kernel_size.size() == 2)
             isConv2D = true;
@@ -357,7 +360,7 @@ public:
 #endif
 #ifdef HAVE_VULKAN
         if (backendId == DNN_BACKEND_VKCOM)
-            return ksize == 2;
+            return ksize == 2 && !variableWeight;
 #endif
 #ifdef HAVE_WEBNN
         if (backendId == DNN_BACKEND_WEBNN)
@@ -665,68 +668,79 @@ public:
         biasvec[outCn] = biasvec[outCn+1] = biasvec[outCn-1];
     }
 
-    virtual Ptr<BackendNode> initVkCom(const std::vector<Ptr<BackendWrapper> > &inputs) CV_OVERRIDE
+    virtual Ptr<BackendNode> initVkCom(const std::vector<Ptr<BackendWrapper> > &inputs, std::vector<Ptr<BackendWrapper> > &outputs) CV_OVERRIDE
     {
 #ifdef HAVE_VULKAN
-        CV_Assert(!blobs.empty());
-        int out_channel = blobs[0].size[0];
         bool has_bias = hasBias() || fusedBias;
-        int filter_size[2] = {kernel.height, kernel.width};
-        int pad_size[2] = {pad.height, pad.width};
-        int stride_size[2] = {stride.height, stride.width};
-        int dilation_size[2] = {dilation.height, dilation.width};
-        int activation = 0;
-        vkcom::Tensor input_tensor = VkComTensor(inputs[0]);
-        int in_channel = input_tensor.dimSize(1);
-        int group = in_channel / blobs[0].size[1];
+        int activationType = transFusedActivType(activ);
 
-        // TODO: support group > 1
-        if (group != 1)
+        CV_Assert(inputs.size() == 1 && outputs.size() == 1);
+        Ptr<VkComBackendWrapper> inputWrap = inputs[0].dynamicCast<VkComBackendWrapper>();
+        Ptr<VkComBackendWrapper> outputWrap = outputs[0].dynamicCast<VkComBackendWrapper>();
+        CV_Assert(inputWrap && outputWrap);
+
+        MatShape inpShape = shape(*inputWrap->getMat());
+        MatShape outShape = shape(*outputWrap->getMat());
+
+        CV_Assert(inpShape.size() == 4 && inpShape.size() == outShape.size());
+
+        if (activationType == -1)
+        {
+            std::cout<<"Unsupported fused Active type in Conv layer!!!"<<std::endl;
+            return Ptr<BackendNode>();
+        }
+
+        if (activationType != 0)
+        {
+            std::cout<<"Unsupported fused Active type in Conv layer!!!"<<std::endl;
+            return Ptr<BackendNode>();
+        }
+
+        // TODO: support group > 1， group 信息需要这样确定吗？
+        const int inpGroupCn = blobs[0].size[1];
+        int ngroups = inpShape[1] / inpGroupCn;
+        CV_Assert(outShape[1] % ngroups == 0);
+        if (ngroups != 1)
             return Ptr<BackendNode>();
 
-        int padding_mode;
-        if (padMode.empty())
-        {
-            padding_mode = vkcom::kPaddingModeCaffe;
-        }
-        else if (padMode == "VALID")
-        {
-            padding_mode = vkcom::kPaddingModeValid;
-        }
-        else if (padMode == "SAME")
-        {
-            padding_mode = vkcom::kPaddingModeSame;
-        }
-        else
-            CV_Error(Error::StsError, "Unsupported padding mode " + padMode);
-
-        std::shared_ptr<vkcom::OpBase> op(new vkcom::OpConv(out_channel, has_bias,
-                    filter_size, pad_size,
-                    stride_size, dilation_size,
-                    activation, group,
-                    padding_mode));
-
-        std::vector<Ptr<BackendWrapper> > blobsWrapper;
-
+        std::vector<Mat> vkBlobs;
         if (fusedWeights)
         {
             Mat wm;
             weightsMat.copyTo(wm); // to handle the case of isContinuous() == false
             wm = wm.reshape(1, blobs[0].dims, blobs[0].size);
-            blobsWrapper.push_back(Ptr<BackendWrapper>(new VkComBackendWrapper(wm)));
+            vkBlobs.push_back(wm);
         }
         else
-        {
-            blobsWrapper.push_back(Ptr<BackendWrapper>(new VkComBackendWrapper(blobs[0])));
-        }
+            vkBlobs.push_back(blobs[0]);
 
         if (has_bias)
         {
-            Mat biasesMat({out_channel}, CV_32F, &biasvec[0]);
-            blobsWrapper.push_back(Ptr<BackendWrapper>(new VkComBackendWrapper(biasesMat)));
+            // TODO replace the 4 with VEC_LEN.
+            int biasAlignedSize = alignSize(outShape[1], 4);
+            Mat biasesMat({biasAlignedSize}, CV_32F, Scalar_<float>(0.0f));
+
+            float* biasPtr = biasesMat.ptr<float>();
+            for (int i = 0; i < biasvec.size(); i++)
+            {
+                *(biasPtr + i) = biasvec[i];
+            }
+
+            vkBlobs.push_back(biasesMat);
         }
 
-        return Ptr<BackendNode>(new VkComBackendNode(inputs, op, blobsWrapper));
+        // TODO not implement the depthwise
+        if (ngroups > 1 && ngroups == outShape[1] && ngroups == inpShape[1])
+            return Ptr<BackendNode>();
+
+
+        CV_Assert(pads_begin.size() == 2);
+        Ptr<vkcom::OpBase> op(new vkcom::OpConv(vkBlobs, activationType, ngroups, outShape[1], inpShape[1],
+                                                            kernel.height, kernel.width, stride.height, stride.width,
+                                                            dilation.height, dilation.width, pads_begin[1], pads_begin[0],
+                                                            fusedAdd));
+
+        return Ptr<BackendNode>(new VkComBackendNode(inputs, op, outputs, fusedAdd));
 #endif  // HAVE_VULKAN
         return Ptr<BackendNode>();
     }
@@ -1245,10 +1259,11 @@ public:
 
         int outCn = blobs.empty() ? inputs[1].size[0] : blobs[0].size[0];
         // Need to align non-const blobs
-        bool variableWeight = false;
-        if (blobs.empty())
+        if (variableWeight)
         {
-            variableWeight = true;
+            if (inputs.size() < 2)
+            CV_Assert(inputs.size() >= 2 && "The input size should greater than or equal to 2, "
+                                            "one is the input data, and the other is the convolution weight.");
             Mat wm = inputs[1].reshape(1, outCn);
             if (wm.data != weightsMat.data)
             {

@@ -12,6 +12,7 @@
 #include "../include/vkcom.hpp"
 #include "context.hpp"
 
+// Don't use the on-fly compilation of SPV.
 #ifdef USE_SHADERC
 #include "shaderc/shaderc.hpp"
 #else
@@ -65,6 +66,7 @@ inline size_t elementSize(Format fmt)
     return 0;
 }
 
+// TODO! we do not need this function, replace it with total().
 inline int shapeCount(const Shape& shape, int start = -1, int end = -1)
 {
     if (start == -1) start = 0;

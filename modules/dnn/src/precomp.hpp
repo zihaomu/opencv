@@ -90,3 +90,9 @@
 #include <opencv2/dnn/shape_utils.hpp>
 
 #include "dnn_common.hpp"
+
+//#ifndef CV_DNN_TICKER
+//#define CV_DNN_TICKER 1
+//cv::TickMeter tick0 = cv::TickMeter();
+//cv::TickMeter tick1 = cv::TickMeter();
+//#endif

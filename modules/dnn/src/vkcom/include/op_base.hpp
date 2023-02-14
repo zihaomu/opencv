@@ -9,6 +9,7 @@
 #define OPENCV_DNN_VKCOM_OP_BASE_HPP
 
 #include "../../precomp.hpp"
+//#include "../../../include/opencv2/dnn/dnn.hpp"
 #include "vkcom.hpp"
 
 namespace cv { namespace dnn { namespace vkcom {
@@ -23,9 +24,7 @@ class OpBase
 public:
     OpBase();
     virtual ~OpBase();
-    virtual bool forward(std::vector<Tensor>& ins,
-                         std::vector<Tensor>& blobs,
-                         std::vector<Tensor>& outs) = 0;
+    virtual bool forward(std::vector<Tensor>& ins, std::vector<Tensor>& outs) = 0;
 protected:
     void initVulkanThing(int buffer_num);
     void createDescriptorSetLayout(int buffer_num);
@@ -44,10 +43,11 @@ protected:
     VkDescriptorSetLayout descriptor_set_layout_;
     VkPipelineLayout pipeline_layout_;
     VkShaderModule module_;
+    int bufferNum_ = -1;
     int group_x_;
     int group_y_;
     int group_z_;
-    std::string type_;
+    OpType type_;
 };
 
 #endif // HAVE_VULKAN

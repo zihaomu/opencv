@@ -30,6 +30,7 @@ OpBase::OpBase()
 OpBase::~OpBase()
 {
     vkDestroyShaderModule(device_, module_, NULL);
+    vkFreeDescriptorSets(device_, descriptor_pool_, 1, &descriptor_set_);
     vkDestroyDescriptorPool(device_, descriptor_pool_, NULL);
     vkDestroyDescriptorSetLayout(device_, descriptor_set_layout_, NULL);
     vkDestroyPipeline(device_, pipeline_, NULL);
@@ -62,6 +63,7 @@ void OpBase::createDescriptorSetLayout(int buffer_num)
     VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device_, &info, NULL, &descriptor_set_layout_));
 }
 
+// TODO buffer_num 什么作用？
 void OpBase::createDescriptorSet(int buffer_num)
 {
     VkDescriptorPoolSize pool_size = {};
@@ -103,20 +105,27 @@ void OpBase::createShaderModule(const uint32_t* spv, size_t sz, const std::strin
     VK_CHECK_RESULT(vkCreateShaderModule(device_, &create_info, NULL, &module_));
 }
 
+/*
+ * 计算专用和渲染专用有着重要区别：
+ * 计算专用只需要关注pipeline是否创建了
+ * */
 void OpBase::createPipeline(size_t push_constants_size, VkSpecializationInfo* specialization_info)
 {
     // create pipeline
+    // 创建 pipeline
     VkPipelineShaderStageCreateInfo stage_create_info = {};
     stage_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    stage_create_info.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    stage_create_info.stage = VK_SHADER_STAGE_COMPUTE_BIT; // 指定是用来计算的。
     stage_create_info.module = module_;
     stage_create_info.pName = "main";
+    // TODO! check if this is important?
     stage_create_info.pSpecializationInfo = specialization_info;
     VkPushConstantRange push_constant_ranges[1] = {};
     push_constant_ranges[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
     push_constant_ranges[0].offset = 0;
     push_constant_ranges[0].size = push_constants_size;
 
+    // 创建Pipeline layout
     VkPipelineLayoutCreateInfo pipeline_layout_create_info = {};
     pipeline_layout_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     if (push_constants_size != 0)
@@ -129,6 +138,7 @@ void OpBase::createPipeline(size_t push_constants_size, VkSpecializationInfo* sp
     VK_CHECK_RESULT(vkCreatePipelineLayout(device_, &pipeline_layout_create_info,
                                            NULL, &pipeline_layout_));
 
+    // 创建计算pipeline
     VkComputePipelineCreateInfo pipeline_create_info = {};
     pipeline_create_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
     pipeline_create_info.stage = stage_create_info;
@@ -148,22 +158,25 @@ void OpBase::createCommandBuffer()
     VK_CHECK_RESULT(vkAllocateCommandBuffers(device_, &info, &cmd_buffer_));
 }
 
+// 目前用到记录command的功能有：push constants，绑定pipeline，绑定descriptorsets，绑定dispatch。
+// 目前没搞懂的是后面两个，descriptorset和dispatch
 void OpBase::recordCommandBuffer(void* push_constants, size_t push_constants_size)
 {
     VkCommandBufferBeginInfo beginInfo = {};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    cv::AutoLock lock(kContextMtx);
+    cv::AutoLock lock(kContextMtx); //TODO 为什么这里要加锁？
     VK_CHECK_RESULT(vkBeginCommandBuffer(cmd_buffer_, &beginInfo));
     if (push_constants)
         vkCmdPushConstants(cmd_buffer_, pipeline_layout_,
                            VK_SHADER_STAGE_COMPUTE_BIT, 0,
                            push_constants_size, push_constants);
+
     vkCmdBindPipeline(cmd_buffer_, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_);
     vkCmdBindDescriptorSets(cmd_buffer_, VK_PIPELINE_BIND_POINT_COMPUTE,
                             pipeline_layout_, 0, 1, &descriptor_set_, 0, NULL);
-    vkCmdDispatch(cmd_buffer_, group_x_, group_y_, group_z_);
 
+    vkCmdDispatch(cmd_buffer_, group_x_, group_y_, group_z_);
     VK_CHECK_RESULT(vkEndCommandBuffer(cmd_buffer_));
 }
 
@@ -181,7 +194,7 @@ void OpBase::runCommandBuffer()
 
     VK_CHECK_RESULT(vkCreateFence(device_, &fence_create_info_, NULL, &fence));
     {
-        cv::AutoLock lock(kContextMtx);
+        cv::AutoLock lock(kContextMtx); //TODO 为什么要lock？
         VK_CHECK_RESULT(vkQueueSubmit(kQueue, 1, &submit_info, fence));
     }
     VK_CHECK_RESULT(vkWaitForFences(device_, 1, &fence, VK_TRUE, 100000000000));

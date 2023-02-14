@@ -136,7 +136,8 @@ public:
             {
                 if (shape[i] != outShape[i])
                 {
-                    CV_Assert(shape[i] == 1 || outShape[i] == 1);
+                    if(!(shape[i] == 1 || outShape[i] == 1))
+                        CV_Assert(shape[i] == 1 || outShape[i] == 1);
                     outShape[i] = std::max(outShape[i], shape[i]);
                 }
             }

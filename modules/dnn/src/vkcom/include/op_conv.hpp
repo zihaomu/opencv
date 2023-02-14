@@ -17,10 +17,11 @@ namespace cv { namespace dnn { namespace vkcom {
 
 enum ConvShaderType
 {
-    kConvShaderTypeBasic = 0,
-    kConvShaderType48,
-    kConvShaderTypeDepthWise,
-    kConvShaderTypeNum
+    kConvShaderTypeGeneric = 0,
+    kConvShaderType44 = 1, //TODO! support the 4x4 block
+    kConvShaderTypeDepthWise = 2,
+    kConvShaderTypeWinograd = 3,
+    kConvShaderTest = 4,
 };
 
 struct ConvShaderConfig
@@ -31,52 +32,62 @@ struct ConvShaderConfig
     int block_height;
     int block_width;
     int block_depth;
-    ConvShaderType shader_type;
 };
+class SubOpConvRepackInput;
 
+// Current Vulkan Convolution layer only support Conv2D.
 class OpConv : public OpBase
 {
 public:
-    OpConv(const int out_channel, const bool has_bias,
-           const int* filter_size, const int* pad,
-           const int* stride, const int* dilation,
-           const int activation, const int group,
-           const int padding_mode);
-    void reshapeOutTensor(Tensor& in, Tensor& out);
+    OpConv(std::vector<Mat>& matBlobs, int activType, const int ngroups, const int K, const int C, const int Hk, const int Wk,
+           const int stride_h, const int stride_w, const int dilation_h, const int dilation_w,
+           const int pad_left, const int pad_top, bool fusedAdd);
+
     bool forward(Tensor& in, Tensor& filter_weights, Tensor& bias, Tensor& out);
-    virtual bool forward(std::vector<Tensor>& ins,
-                         std::vector<Tensor>& blobs,
-                         std::vector<Tensor>& outs) CV_OVERRIDE;
+    virtual bool forward(std::vector<Tensor>& ins, std::vector<Tensor>& outs) CV_OVERRIDE;
+    Ptr<Tensor> weightTensorPtr;
+    Ptr<Tensor> biasTensorPtr;
+    Ptr<Tensor> testTensorPtr;
+    Ptr<SubOpConvRepackInput> operation;
 private:
-    bool init(const int out_channel, const bool has_bias,
-              const int* filter_size, const int* pad,
-              const int* stride, const int* dilation,
-              const int activation, const int group,
-              const int padding_mode);
     bool computeGroupCount();
 
-    int batch_;
-    int in_height_;
-    int in_width_;
-    int in_channel_;
-    int out_height_;
-    int out_width_;
-    int out_channel_;
-    int filter_height_;
-    int filter_width_;
-    int stride_height_;
-    int stride_width_;
-    int padding_top_;
-    int padding_left_;
-    int dilation_height_;
-    int dilation_width_;
-    int activation_;
-    PaddingMode padding_mode_;
-    int group_;
-    int has_bias_;
-    Tensor swizzled_weights;
-    ConvShaderConfig config_;
-    bool dwconv_;
+    FusedActivationType activ;
+    const int ngroups;
+    const int K, C, Hk, Wk; // output channel, input channel, height of kernel, width of kernel.
+    const int stride_h, stride_w;
+    const int dilation_h, dilation_w;
+    const int pad_top, pad_left;
+    const bool fusedAdd;
+
+    int H0, W0;
+    int Hi, Wi;
+    int batch;
+    int Kg, Cg;
+    int CgHkWk, ksize;
+
+    ConvShaderType shaderType;
+    ConvShaderConfig config;
+};
+
+// This Op will repack the input data from [N, C, H, W] to [ngroups, ceil(H0*W0/VEL_LEN), Cg*Hk*Wk, VEC_LEN]
+class SubOpConvRepackInput : OpBase
+{
+public:
+    SubOpConvRepackInput(const int ngroups,const int batch, const int Hi, const int Wi, const int H0, const int W0,  const int C, const int Hk, const int Wk,
+                         const int stride_h, const int stride_w, const int dilation_h, const int dilation_w,
+                         const int pad_left, const int pad_top);
+    virtual bool forward(std::vector<Tensor>& ins, std::vector<Tensor>& outs) CV_OVERRIDE;
+private:
+    bool computeGroupCount();
+    const int ngroups, batch;
+    const int Hi, Wi, H0, W0;
+    const int C, Hk, Wk;
+    const int stride_h, stride_w;
+    const int dilation_h, dilation_w;
+    const int pad_top, pad_left;
+    int Cg;
+    ConvShaderConfig config;
 };
 
 #endif // HAVE_VULKAN

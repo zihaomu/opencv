@@ -1,4 +1,7 @@
 #version 450
+#define LOCAL_SZ_X 256
+
+// with weight pack.
 
 layout(binding = 0) readonly buffer Input0{
     float image_data[];
@@ -37,13 +40,7 @@ layout(push_constant) uniform pushBlock {
     int basic_shader_partition_size; // what's this？
 } p;
 
-//layout (constant_id = 21) const int LOCAL_SZ_X = 0;
-//layout (constant_id = 22) const int LOCAL_SZ_Y = 0;
-//layout (constant_id = 23) const int LOCAL_SZ_Z = 0;
-
-// dynamic assign the local size xyz
-//layout(local_size_x_id = 21, local_size_y_id = 22, local_size_z_id = 23) in;
-//layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
 void main()
 {
     int gx = int(gl_GlobalInvocationID.x); // H0*W0

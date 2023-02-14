@@ -12,6 +12,7 @@ namespace cv { namespace dnn { namespace vkcom {
 
 #ifdef HAVE_VULKAN
 
+// 最重要的一个类，Context包含所有VK后端所用到的资源。
 class Context
 {
 public:

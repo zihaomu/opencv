@@ -15,6 +15,7 @@ namespace cv { namespace dnn { namespace vkcom {
 
 Tensor::Tensor(Format fmt) : size_in_byte_(0), format_(fmt)
 {
+    // 初始化就创建Context？？
     createContext();
     device_ = kDevice;
 }
@@ -55,7 +56,7 @@ int Tensor::count(const int start_axis, const int end_axis) const
 int Tensor::dimSize(const int axis) const
 {
     CV_Assert(axis >= 0);
-    CV_Assert(axis < shape_.size());
+    CV_Assert(axis < (int)shape_.size());
 
     return shape_[axis];
 }
@@ -63,6 +64,21 @@ int Tensor::dimSize(const int axis) const
 int Tensor::dimNum() const
 {
     return shape_.size();
+}
+
+// ------------- TODEL
+void print10c(const char *p)
+{
+    for (int i = 0; i < 10; i++)
+        std::cout<<","<<*((char *)p + i);
+    std::cout<<"."<<std::endl;
+}
+
+void print10(void *p)
+{
+    for (int i = 0; i < 10; i++)
+        std::cout<<","<<*((char *)p + i);
+    std::cout<<"."<<std::endl;
 }
 
 Tensor Tensor::reshape(const char* data, const std::vector<int>& shape, bool alloc, Format fmt)
@@ -89,8 +105,14 @@ Tensor Tensor::reshape(const char* data, const std::vector<int>& shape, bool all
     }
     else if (data)
     {
+        // 在这里进行拷贝。
         void* p = map();
         memcpy(p, data, size_in_byte_);
+
+        // TODEL
+//        print10(p);
+//        print10c(data);
+
         unMap();
     }
 
@@ -119,10 +141,12 @@ int Tensor::getFormat() const
     return format_;
 }
 
+// 拷贝GPU中的数据
 void Tensor::copyTo(Tensor& dst)
 {
+    // 首先用一个指针映射到GPU的内存
     void* p = map();
-    dst.reshape((const char*)p, shape_, format_);
+    dst.reshape((const char*)p, shape_, true, format_);
     unMap();
 }
 

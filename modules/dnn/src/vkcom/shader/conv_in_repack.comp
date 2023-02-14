@@ -1,0 +1,118 @@
+#version 450
+
+#define VEC_LEN 4
+
+layout(binding = 0) readonly buffer Input0{
+    float input_data[];
+};
+layout(binding = 1) buffer Output{
+    vec4 input_repack_data[];
+};
+
+layout(push_constant) uniform pushBlock {
+    int in_h;
+    int in_w;
+    int out_h;
+    int out_w;
+    int group;
+    int batch;
+    int kernel_h;
+    int kernel_w;
+    int stride_h;
+    int stride_w;
+    int pad_top;
+    int pad_left;
+    int dilation_h;
+    int dilation_w;
+    int Cg; // channel
+} p;
+
+// dynamic assign the local size xyz
+//layout(local_size_x_id = 21, local_size_y_id = 22, local_size_z_id = 23) in;
+//layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+void main()
+{
+    int gx = int(gl_GlobalInvocationID.x); // (H0*W0 / 4) * Cg
+    int gy = int(gl_GlobalInvocationID.y); // batch * group.
+
+    int input_plane = p.in_h * p.in_w;
+    int out_plane = p.out_h * p.out_w;
+    int out_plane_stripes = (out_plane + VEC_LEN - 1)/VEC_LEN;
+    int out_plane_aligned = out_plane_stripes * VEC_LEN;
+
+    if (gx < out_plane_stripes * p.Cg && gy < p.group * p.batch)
+    {
+        int Cgi = gx/out_plane_stripes;
+        int hw_strip = gx - Cgi * out_plane_stripes;
+        int hw0 = hw_strip*VEC_LEN;
+
+        int CgHkWk = p.Cg * p.kernel_h * p.kernel_w;
+        int h0_ = hw0 / p.out_w;
+        int w0_ = hw0 - h0_ * p.out_w;
+
+        int ksize = p.kernel_h * p.kernel_w;
+        int input_off = (gy * p.Cg + Cgi) * input_plane;
+        int output_off = gy * out_plane_stripes * CgHkWk + CgHkWk * hw_strip + Cgi * ksize;
+
+        for (int k = 0; k < ksize; k++)
+        {
+            int i = 0, h0 = h0_, w0 = w0_;
+            int hk = k / p.kernel_w;
+            int wk = k - hk * p.kernel_w;
+            int dh = hk * p.dilation_h, dw = wk * p.dilation_w;
+
+            for (; i < VEC_LEN;)
+            {
+                int hi = h0 * p.stride_h + dh - p.pad_top;
+                int wi = w0 * p.stride_w + dw - p.pad_left;
+
+                // TODEL
+//                int input_off1 = input_off + hi * p.in_w + wi;
+//                input_repack_data[output_off + k] = vec4(float(hi), float(wi), float(input_off1), 0);
+//                i+= VEC_LEN;
+//                continue;
+
+                if (uint(hi) < uint(p.in_h) && uint(wi) < uint(p.in_w))
+                {
+                    int input_off1 = input_off + hi * p.in_w + wi;
+                    int output_off1 = output_off + k;
+
+                    if (i == 0 && w0 + VEC_LEN <= p.out_w && wi + p.stride_w * VEC_LEN <= p.in_w)
+                    {
+                        if (p.stride_w == 1)
+                        {
+                            input_repack_data[output_off1].x = input_data[input_off1];
+                            input_repack_data[output_off1].y = input_data[input_off1 + 1];
+                            input_repack_data[output_off1].z = input_data[input_off1 + 2];
+                            input_repack_data[output_off1].w = input_data[input_off1 + 3];
+                        }
+                        else
+                        {
+                            input_repack_data[output_off1].x = input_data[input_off1];
+                            input_repack_data[output_off1].y = input_data[input_off1 + 1*p.stride_w];
+                            input_repack_data[output_off1].z = input_data[input_off1 + 2*p.stride_w];
+                            input_repack_data[output_off1].w = input_data[input_off1 + 3*p.stride_w];
+                        }
+                        i += VEC_LEN;
+                        w0 += VEC_LEN;
+                    }
+                    else
+                    {
+                        input_repack_data[output_off1][i] = input_data[input_off1];
+                        i++;
+                        w0++;
+                    }
+                }
+                else
+                {
+                    i++;
+                    w0++;
+                }
+
+                int mask = w0 >= p.out_w ? 1 : 0;
+                h0 += mask;
+                w0 &= mask - 1;
+            }
+        }
+    }
+}

@@ -14,12 +14,18 @@ namespace cv { namespace dnn { namespace vkcom {
 
 #ifdef HAVE_VULKAN
 
-std::shared_ptr<Context> kCtx;
+// ENABLE_VALIDATION_LAYER
+#ifndef ENABLE_VALIDATION_LAYER
+#define ENABLE_VALIDATION_LAYER 1
+#endif
+
 bool enableValidationLayers = false;
-VkInstance kInstance;
-VkPhysicalDevice kPhysicalDevice;
-VkDevice kDevice;
-VkQueue kQueue;
+
+std::shared_ptr<Context> kCtx; // context是全局只有一份。
+VkInstance kInstance; // 这个也是全局只有一份。
+VkPhysicalDevice kPhysicalDevice; // 物理设备，在有多个物理设备的平台上，需要挑选出合适的物理设备
+VkDevice kDevice;  // 逻辑设备，用来承接pipeline，内存分配，计算等实际干活的东西
+VkQueue kQueue; // Queue 队列。
 VkCommandPool kCmdPool;
 VkDebugReportCallbackEXT kDebugReportCallback;
 uint32_t kQueueFamilyIndex;
@@ -84,10 +90,11 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debugReportCallbackFn(
         return VK_FALSE;
 }
 
+// 这个函数只
 // internally used
 void createContext()
 {
-    cv::AutoLock lock(kContextMtx);
+    cv::AutoLock lock(kContextMtx); // only run once
     if (!kCtx)
     {
         kCtx.reset(new Context());
@@ -109,23 +116,25 @@ bool isAvailable()
     return true;
 }
 
+// Context实际上是建立物理设备和逻辑设备的桥梁。
+// 这个代码有大问题，无法在M1上运行，M1上的代码是没有Validation的。
 Context::Context()
 {
-    if(!loadVulkanLibrary())
-    {
-        CV_Error(Error::StsError, "loadVulkanLibrary failed");
-        return;
-    }
-    else if (!loadVulkanEntry())
-    {
-        CV_Error(Error::StsError, "loadVulkanEntry failed");
-        return;
-    }
-    else if (!loadVulkanGlobalFunctions())
-    {
-        CV_Error(Error::StsError, "loadVulkanGlobalFunctions failed");
-        return;
-    }
+//    if(!loadVulkanLibrary())
+//    {
+//        CV_Error(Error::StsError, "loadVulkanLibrary failed");
+//        return;
+//    }
+//    else if (!loadVulkanEntry())
+//    {
+//        CV_Error(Error::StsError, "loadVulkanEntry failed");
+//        return;
+//    }
+//    else if (!loadVulkanGlobalFunctions())
+//    {
+//        CV_Error(Error::StsError, "loadVulkanGlobalFunctions failed");
+//        return;
+//    }
 
     // create VkInstance, VkPhysicalDevice
     std::vector<const char *> enabledExtensions;
@@ -194,6 +203,7 @@ Context::Context()
     createInfo.enabledExtensionCount = enabledExtensions.size();
     createInfo.ppEnabledExtensionNames = enabledExtensions.data();
 
+    // 这里创建就出错。Why？？？
     VK_CHECK_RESULT(vkCreateInstance(&createInfo, NULL, &kInstance));
 
     if (!loadVulkanFunctions(kInstance))
@@ -260,6 +270,23 @@ Context::Context()
 
     VK_CHECK_RESULT(vkCreateDevice(kPhysicalDevice, &deviceCreateInfo, NULL, &kDevice));
 
+    // --------------------
+    // TODEL
+
+    VkPhysicalDeviceSubgroupProperties subgroupProperties;
+    subgroupProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
+    subgroupProperties.pNext = NULL;
+
+    VkPhysicalDeviceProperties2 physicalDeviceProperties;
+    physicalDeviceProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+    physicalDeviceProperties.pNext = &subgroupProperties;
+
+    // TODO Add full GPU info at here.
+    vkGetPhysicalDeviceProperties2(kPhysicalDevice, &physicalDeviceProperties);
+    std::cout<<"Hard physical device subgraph size = "<<subgroupProperties.subgroupSize<<std::endl;
+
+    // -------------------
+
     // Get a handle to the only member of the queue family.
     vkGetDeviceQueue(kDevice, kQueueFamilyIndex, 0, &kQueue);
 
@@ -278,7 +305,8 @@ Context::~Context()
     vkDestroyCommandPool(kDevice, kCmdPool, NULL);
     vkDestroyDevice(kDevice, NULL);
 
-    if (enableValidationLayers) {
+    if (enableValidationLayers)
+    {
         auto func = (PFN_vkDestroyDebugReportCallbackEXT)
             vkGetInstanceProcAddr(kInstance, "vkDestroyDebugReportCallbackEXT");
         if (func == nullptr)
@@ -291,6 +319,7 @@ Context::~Context()
         }
     }
     kShaders.clear();
+    kEnabledLayers.clear();
     vkDestroyInstance(kInstance, NULL);
 
     return;

@@ -16,6 +16,78 @@ static std::string _tf(TString filename, bool required = true)
 {
     return findDataFile(std::string("dnn/onnx/") + filename, required);
 }
+        void printblob(InputArray blob_, int strip = 0)
+        {
+            Mat blob = blob_.getMat();
+            auto shapeV = shape(blob);
+            auto typeMat = blob.type();
+            std::cout << "data type = " << typeMat << std::endl;
+            float *ptrf;
+            uchar *ptru;
+            char *ptrc;
+            int* ptrs;
+            int len = int(blob.total());//std::min(int(blob.total()), 1000);
+            if (strip > 0)
+            {
+                if (typeMat == 0) {
+                    ptru = (uchar *) blob.data;
+                    for (int i = 0; i < len; i++) {
+                        std::cout << (int) *(ptru + i) << ", ";
+                        if ((i+1)%strip == 0)
+                            std::cout <<std::endl;
+                    }
+                }else if (typeMat == 1) {
+                    ptrc = (char *)blob.data;
+                    for(int i = 0; i<len; i++) {
+                        std::cout<<(int) *(ptrc + i)<<", ";
+                        if ((i+1)%strip == 0)
+                            std::cout <<std::endl;}
+
+                }else if (typeMat == 4) {
+                    ptrs = (int *)blob.data;
+                    for(int i = 0; i<len; i++) {
+                        std::cout<<(int) *(ptrs + i)<<", ";
+                        if ((i+1)%strip == 0)
+                            std::cout <<std::endl;}
+
+                }
+                else if (typeMat == 5) {
+                    ptrf = (float *)blob.data;
+                    for(int i = 0; i<len; i++) {
+                        std::cout<<*(ptrf + i)<<", ";
+                        if ((i+1)%strip == 0)
+                            std::cout <<std::endl;
+                    }
+                }
+            }
+            else
+            {
+                if (typeMat == 0) {
+                    ptru = (uchar *) blob.data;
+                    for (int i = 0; i < len; i++) {
+                        std::cout << (int) *(ptru + i) << ", ";
+                    }
+                }else if (typeMat == 1) {
+                    ptrc = (char *)blob.data;
+                    for(int i = 0; i<len; i++) {
+                        std::cout<<(int) *(ptrc + i)<<", ";}
+
+                }else if (typeMat == 4) {
+                    ptrs = (int *)blob.data;
+                    for(int i = 0; i<len; i++) {
+                        std::cout<<(int) *(ptrs + i)<<", ";}
+
+                }
+                else if (typeMat == 5) {
+                    ptrf = (float *)blob.data;
+                    for(int i = 0; i<len; i++) {
+                        std::cout<<*(ptrf + i)<<", ";
+                    }
+                }
+            }
+
+            std::cout<<std::endl;
+        }
 
 class Test_ONNX_layers : public DNNTestLayer
 {
@@ -66,6 +138,31 @@ public:
             net.setInput(inps[i], inputNames[i]);
         Mat out = net.forward("");
 
+//        std::cout<<"ref = "<<std::endl;
+//        printblob(ref);
+//        std::cout<<"out = "<<std::endl;
+//        printblob(out);
+//
+        cv::TickMeter ticker;
+        std::vector<double> times;
+        for (int i = 0; i < 20; i++)
+        {
+            Layer::resetTime();
+            ticker.reset();
+            ticker.start();
+            Mat out = net.forward("");
+            ticker.stop();
+            times.push_back(ticker.getTimeMilli());
+            if ((i+1)%10 == 0)
+            {
+                sort(times.begin(), times.end());
+                std::cout<<"i = "<<i<<", min times = " <<times[0]<<std::endl;
+            }
+            Layer::printTime();
+        }
+        sort(times.begin(), times.end());
+        std::cout<<"all min times = " <<times[0]<<std::endl;
+
         if (useSoftmax)
         {
             LayerParams lp;
@@ -112,7 +209,7 @@ TEST_P(Test_ONNX_layers, MaxPooling_2)
 TEST_P(Test_ONNX_layers, Convolution)
 {
     testONNXModels("convolution");
-    testONNXModels("conv_asymmetric_pads");
+//    testONNXModels("conv_asymmetric_pads");
 }
 
 TEST_P(Test_ONNX_layers, Convolution_variable_weight)

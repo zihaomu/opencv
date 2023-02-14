@@ -826,6 +826,7 @@ void Net::Impl::forwardLayer(LayerData& ld)
                 try
                 {
                     forwardVkCom(ld.outputBlobsWrappers, node);
+//                    std::cout<<"ld.name = "<<ld.name<<std::endl;
                 }
                 catch (const cv::Exception& e)
                 {
@@ -841,6 +842,9 @@ void Net::Impl::forwardLayer(LayerData& ld)
             }
         }
 
+//        std::cout<<"run layer name = "<<ld.name<<", out = "<<std::endl;
+//        ld.outputBlobsWrappers[0]->copyToHost();
+//        printblob(ld.outputBlobs[0], 4);
         tm.stop();
         int64 t = tm.getTimeTicks();
         layersTimings[ld.id] = (t > 0) ? t : t + 1;  // zero for skipped layers only

@@ -19,7 +19,6 @@ namespace cv { namespace dnn { namespace vkcom {
 #ifdef HAVE_VULKAN
 
 class Buffer;
-
 class Tensor
 {
 public:
@@ -43,6 +42,26 @@ public:
     bool isEmpty() { return size_in_byte_ == 0 ? true : false; }
     void copyTo(Tensor& dst);
     std::shared_ptr<Buffer> getBuffer() { return buffer_; }
+
+    void copyToMat(Mat& m)
+    {
+        CV_Assert(m.type() == CV_32F);
+        std::vector<int> shape = getShape();
+        void *data = map();
+        Mat tmp(shape, CV_32F, data);
+        tmp.copyTo(m);
+        unMap();
+    }
+
+    void printTensor(int stripe = 0)
+    {
+        std::vector<int> shap = getShape();
+        Mat tmp(shap, CV_32F);
+        copyToMat(tmp);
+
+        std::cout<<"print data from tensor is "<<std::endl;
+        printblob(tmp, stripe);
+    }
 
 private:
     VkDevice device_;

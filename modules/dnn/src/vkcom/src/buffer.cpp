@@ -14,12 +14,15 @@ namespace cv { namespace dnn { namespace vkcom {
 
 #ifdef HAVE_VULKAN
 
+// 这串代码是从vk官方教程直接抄的。
 static uint32_t findMemoryType(uint32_t memoryTypeBits, VkMemoryPropertyFlags properties)
 {
     VkPhysicalDeviceMemoryProperties memoryProperties;
 
+    // 查询到当前设备支持到内存属性。
     vkGetPhysicalDeviceMemoryProperties(kPhysicalDevice, &memoryProperties);
 
+    // 从中找出满足要求到内存属性。
     for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; ++i) {
         if ((memoryTypeBits & (1 << i)) &&
                 ((memoryProperties.memoryTypes[i].propertyFlags & properties) == properties))
@@ -56,12 +59,14 @@ bool Buffer::init(size_t size_in_bytes, const char* data)
 
     if (data)
     {
+        // 这个操作是首先将数据复制到CPU上到一块内存，然后映射到GPU的内存上，最后解除映射，这样GPU上到buffer就有了正确到内存数据。
         char* dst;
         VK_CHECK_RESULT(vkMapMemory(device_, memory_, 0, size_in_bytes, 0, (void **)&dst));
         memcpy(dst, data, size_in_bytes);
         vkUnmapMemory(device_, memory_);
     }
 
+    // 关联buffer和memory，分配到内存，和缓冲对象。
     VK_CHECK_RESULT(vkBindBufferMemory(device_, buffer_, memory_, 0));
     return true;
 }

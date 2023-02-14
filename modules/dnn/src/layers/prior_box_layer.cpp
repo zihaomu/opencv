@@ -297,8 +297,10 @@ public:
             return _explicitSizes || _stepX == _stepY;
 #endif
         return backendId == DNN_BACKEND_OPENCV ||
-               backendId == DNN_BACKEND_CUDA ||
-               (backendId == DNN_BACKEND_VKCOM && haveVulkan());
+               backendId == DNN_BACKEND_CUDA
+//               ||
+//               (backendId == DNN_BACKEND_VKCOM && haveVulkan())
+               ;
     }
 
     bool getMemoryShapes(const std::vector<MatShape> &inputs,
@@ -609,17 +611,17 @@ public:
 #endif
 
 
-#ifdef HAVE_VULKAN
-    virtual Ptr<BackendNode> initVkCom(const std::vector<Ptr<BackendWrapper> > &input) CV_OVERRIDE
-    {
-        std::shared_ptr<vkcom::OpBase> op(new vkcom::OpPriorBox(_stepX, _stepY,
-                                                                _clip, _numPriors,
-                                                                _variance, _offsetsX,
-                                                                _offsetsY, _boxWidths,
-                                                                _boxHeights));
-        return Ptr<BackendNode>(new VkComBackendNode(input, op));
-    }
-#endif // HAVE_VULKAN
+//#ifdef HAVE_VULKAN
+//    virtual Ptr<BackendNode> initVkCom(const std::vector<Ptr<BackendWrapper> > &input) CV_OVERRIDE
+//    {
+//        std::shared_ptr<vkcom::OpBase> op(new vkcom::OpPriorBox(_stepX, _stepY,
+//                                                                _clip, _numPriors,
+//                                                                _variance, _offsetsX,
+//                                                                _offsetsY, _boxWidths,
+//                                                                _boxHeights));
+//        return Ptr<BackendNode>(new VkComBackendNode(input, op));
+//    }
+//#endif // HAVE_VULKAN
 
 
     virtual int64 getFLOPS(const std::vector<MatShape> &inputs,

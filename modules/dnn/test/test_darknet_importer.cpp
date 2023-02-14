@@ -53,6 +53,79 @@ static std::string _tf(TString filename)
     return (getOpenCVExtraDir() + "/dnn/") + filename;
 }
 
+void printblob(InputArray blob_, int strip = 0)
+{
+    Mat blob = blob_.getMat();
+    auto shapeV = shape(blob);
+    auto typeMat = blob.type();
+    std::cout << "data type = " << typeMat << std::endl;
+    float *ptrf;
+    uchar *ptru;
+    char *ptrc;
+    int* ptrs;
+    int len = std::min(int(blob.total()), 1000);
+    if (strip > 0)
+    {
+        if (typeMat == 0) {
+            ptru = (uchar *) blob.data;
+            for (int i = 0; i < len; i++) {
+                std::cout << (int) *(ptru + i) << ", ";
+                if ((i+1)%strip == 0)
+                    std::cout <<std::endl;
+            }
+        }else if (typeMat == 1) {
+            ptrc = (char *)blob.data;
+            for(int i = 0; i<len; i++) {
+                std::cout<<(int) *(ptrc + i)<<", ";
+                if ((i+1)%strip == 0)
+                    std::cout <<std::endl;}
+
+        }else if (typeMat == 4) {
+            ptrs = (int *)blob.data;
+            for(int i = 0; i<len; i++) {
+                std::cout<<(int) *(ptrs + i)<<", ";
+                if ((i+1)%strip == 0)
+                    std::cout <<std::endl;}
+
+        }
+        else if (typeMat == 5) {
+            ptrf = (float *)blob.data;
+            for(int i = 0; i<len; i++) {
+                std::cout<<*(ptrf + i)<<", ";
+                if ((i+1)%strip == 0)
+                    std::cout <<std::endl;
+            }
+        }
+    }
+    else
+    {
+        if (typeMat == 0) {
+            ptru = (uchar *) blob.data;
+            for (int i = 0; i < len; i++) {
+                std::cout << (int) *(ptru + i) << ", ";
+            }
+        }else if (typeMat == 1) {
+            ptrc = (char *)blob.data;
+            for(int i = 0; i<len; i++) {
+                std::cout<<(int) *(ptrc + i)<<", ";}
+
+        }else if (typeMat == 4) {
+            ptrs = (int *)blob.data;
+            for(int i = 0; i<len; i++) {
+                std::cout<<(int) *(ptrs + i)<<", ";}
+
+        }
+        else if (typeMat == 5) {
+            ptrf = (float *)blob.data;
+            for(int i = 0; i<len; i++) {
+                std::cout<<*(ptrf + i)<<", ";
+            }
+        }
+    }
+
+    std::cout<<std::endl;
+}
+
 TEST(Test_Darknet, read_tiny_yolo_voc)
 {
     Net net = readNetFromDarknet(_tf("tiny-yolo-voc.cfg"));
@@ -121,6 +194,11 @@ public:
         net.setInput(inp);
         Mat out = net.forward();
         normAssert(out, ref, "", default_l1, default_lInf);
+
+        std::cout<<"out = "<<std::endl;
+        printblob(out);
+        std::cout<<"ref = "<<std::endl;
+        printblob(ref);
 
         if (inp.size[0] == 1 && testBatchProcessing)  // test handling of batch size
         {

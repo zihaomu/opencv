@@ -99,6 +99,7 @@ void main()
         vec4 dot5 = vec4(0.f);
         vec4 dot6 = vec4(0.f);
         vec4 dot7 = vec4(0.f);
+
         int i = 0;
         do
         {

@@ -3,7 +3,7 @@
 // of this distribution and at http://opencv.org/license.html.
 
 #include "precomp.hpp"
-
+//#include "./vkcom/src/common.hpp"
 #include "net_impl.hpp"
 
 namespace cv {
