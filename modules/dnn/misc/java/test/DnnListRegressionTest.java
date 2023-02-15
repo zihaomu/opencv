@@ -66,7 +66,7 @@ public class DnnListRegressionTest extends OpenCVTestCase {
         Mat image = Imgcodecs.imread(sourceImageFile);
         assertNotNull("Loading image from file failed!", image);
 
-        Mat inputBlob = Dnn.blobFromImage(image, 1.0, new Size(224, 224), new Scalar(0), true, true);
+        Mat inputBlob = Dnn.blobFromImage(image, new Scalar(1.0), new Size(224, 224), new Scalar(0), true, true);
         assertNotNull("Converting image to blob failed!", inputBlob);
 
         net.setInput(inputBlob, "input");

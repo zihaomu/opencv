@@ -997,12 +997,12 @@ TEST_P(Test_Int8_nets, EfficientDet)
                                     0, 17, 0.8245924, 0.16657517850399017, 0.3996818959712982, 0.4111558794975281, 0.9306337833404541,
                                     0, 7, 0.8039304, 0.6118435263633728, 0.13175517320632935, 0.9065558314323425, 0.2943994700908661);
 
-    float confThreshold = 0.65, scoreDiff = 0.3, iouDiff = 0.18;
+    float confThreshold = 0.85, scoreDiff = 0.3, iouDiff = 0.18;
     testDetectionNet(net, blob, ref, confThreshold, scoreDiff, iouDiff);
 
     {
         SCOPED_TRACE("Per-tensor quantize");
-        testDetectionNet(net, blob, ref, 0.85, scoreDiff, iouDiff, false);
+        testDetectionNet(net, blob, ref, confThreshold, scoreDiff, iouDiff, false);
     }
 }
 

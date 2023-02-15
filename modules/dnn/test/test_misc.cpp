@@ -63,6 +63,95 @@ TEST(imagesFromBlob, Regression)
     }
 }
 
+TEST(blobFromImageParam_4ch, depth_FP16)
+{
+    Mat ch[4];
+    for(int i = 0; i < 4; i++)
+        ch[i] = Mat::ones(10, 10, CV_8U)*i;
+
+    Mat img;
+    merge(ch, 4, img);
+
+    Mat blob1 = blobFromImage(img, 1.0, Size(), Scalar(), false, false, CV_16F);
+    Mat blobFp32 = blobFromImage(img, 1.0, Size(), Scalar(), false, false, CV_32F);
+    Mat blob2;
+    blobFp32.convertTo(blob2, CV_16F);
+
+    ImagePParam param;
+    param.ddepth = CV_16F;
+    Mat blob3 = blobFromImageParam(img, param);
+
+    EXPECT_EQ(0, cvtest::norm(blob1, blob2, NORM_INF));
+    EXPECT_EQ(0, cvtest::norm(blob2, blob3, NORM_INF));
+    EXPECT_TRUE(blob1.depth() == CV_16F && blob3.depth() == CV_16F);
+}
+
+TEST(blobFromImageParam_4ch, NHWC_scalar_scale)
+{
+    Mat ch[4];
+    for(int i = 0; i < 4; i++)
+        ch[i] = Mat::ones(10, 10, CV_8U)*i;
+
+    std::vector<double> factorVec = {0.1, 0.2, 0.3, 0.4};
+
+    Scalar scalefactor(factorVec[0], factorVec[1], factorVec[2], factorVec[3]);
+    Mat img;
+    merge(ch, 4, img);
+
+    ImagePParam param;
+    param.scalefactor = scalefactor;
+    param.datalayout = DNN_LAYOUT_NHWC;
+    Mat blob = dnn::blobFromImageParam(img, param); // [1, 10, 10, 4]
+
+    float* blobPtr = blob.ptr<float>(0);
+
+    std::vector<float> targetVec = {(float )factorVec[0] * 0, (float )factorVec[1] * 1, (float )factorVec[2] * 2, (float )factorVec[3] * 3}; // Target Value.
+    for (int hi = 0; hi < 10; hi++)
+    {
+        for (int wi = 0; wi < 10; wi++)
+        {
+            float* hwPtr = blobPtr + hi * 10 * 4 + wi * 4;
+
+            // Check equal
+            EXPECT_NEAR(hwPtr[0], targetVec[0], 1e-5);
+            EXPECT_NEAR(hwPtr[1], targetVec[1], 1e-5);
+            EXPECT_NEAR(hwPtr[2], targetVec[2], 1e-5);
+            EXPECT_NEAR(hwPtr[3], targetVec[3], 1e-5);
+        }
+    }
+}
+
+TEST(blobFromImageParam_4ch, letter_box)
+{
+    Size targeSize(20, 20);
+    Mat ch[4];
+    for(int i = 0; i < 4; i++)
+        ch[i] = Mat::ones(40, 20, CV_8U)*i;
+
+    // Construct target mat.
+    Mat targetCh[4];
+    // The letterbox will add zero at the left and right of output blob.
+    // After the letterbox, every row data would have same value showing as valVec.
+    std::vector<uint8_t> valVec = {0,0,0,0,0, 1,1,1,1,1,1,1,1,1,1, 0,0,0,0,0};
+    Mat rowM(1, 20, CV_8UC1, valVec.data());
+
+    for(int i = 0; i < 4; i++)
+    {
+        targetCh[i] = rowM * i;
+    }
+
+    Mat img, targetImg;
+    merge(ch, 4, img);
+    merge(targetCh, 4, targetImg);
+
+    ImagePParam param;
+    param.size = targeSize;
+    param.mode = DNN_PP_LETTERBOX;
+    Mat blob = dnn::blobFromImageParam(img, param);
+    Mat targetBlob = dnn::blobFromImage(targetImg, 1.0, targeSize); // only convert data from uint8 to float32.
+    EXPECT_EQ(0, cvtest::norm(targetBlob, blob, NORM_INF));
+}
+
 TEST(readNet, Regression)
 {
     Net net = readNet(findDataFile("dnn/squeezenet_v1.1.prototxt"),
