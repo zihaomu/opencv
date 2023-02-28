@@ -85,6 +85,10 @@ struct LayerData
     std::vector<int> cudaD2HBackgroundTransfers;
 #endif
 
+//#ifdef HAVE_VULKAN
+//    std::vector<VkDeviceMemory> vulkanMemory;
+//#endif
+
     Ptr<Layer> layerInstance;
     std::vector<Mat> outputBlobs;
     std::vector<Mat*> inputBlobs;

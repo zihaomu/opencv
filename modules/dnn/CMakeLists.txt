@@ -177,6 +177,22 @@ if(HAVE_TIMVX)
     list(APPEND libs -Wl,--whole-archive ${TIMVX_LIBRARY} -Wl,--no-whole-archive)
 endif()
 
+if(HAVE_VULKAN)
+  # re-compile the comp file to binary code.
+#  execute_process(
+#          COMMAND python3 "./spirv_generator.py"
+#          WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/src/vkcom/shader"
+#          OUTPUT_VARIABLE TRY_OUT
+#  )
+
+#  message("python3 spirv_generator.py is ${TRY_OUT}.")
+
+  message("in DNN VULKAN_INCLUDE_DIRS = ${VULKAN_INCLUDE_DIRS}")
+  message("in DNN VULKAN_LIBRARIES = ${VULKAN_LIBRARIES}")
+  list(APPEND include_dirs ${VULKAN_INCLUDE_DIRS})
+  list(APPEND libs ${VULKAN_LIBRARIES})
+endif()
+
 if(HAVE_CANN)
   list(APPEND include_dirs ${CANN_INCLUDE_DIRS})
   list(APPEND libs -Wl,--whole-archive ${CANN_LIBRARIES} -Wl,--no-whole-archive)

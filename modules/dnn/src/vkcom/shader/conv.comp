@@ -1,5 +1,5 @@
 #version 450
-#define LOCAL_SZ_X 256
+#define LOCAL_SZ_X 128
 layout(binding = 0) readonly buffer Input0{
     float image_data[];
 };
@@ -13,7 +13,7 @@ layout(binding = 3) writeonly buffer Output{
     float convolved_image_data[];
 };
 
-layout(push_constant) uniform pushBlock {
+layout(binding = 4) uniform pushBlock {
     int in_h;
     int in_w;
     int out_h;

@@ -362,14 +362,14 @@ public:
     }
 #endif
 
-    virtual Ptr<BackendNode> initVkCom(const std::vector<Ptr<BackendWrapper> > &inputs) CV_OVERRIDE
-    {
-#ifdef HAVE_VULKAN
-        std::shared_ptr<vkcom::OpBase> op(new vkcom::OpLRN(size / 2, bias, alpha, beta, normBySize));
-        return Ptr<BackendNode>(new VkComBackendNode(inputs, op));
-#endif
-        return Ptr<BackendNode>();
-    }
+//    virtual Ptr<BackendNode> initVkCom(const std::vector<Ptr<BackendWrapper> > &inputs) CV_OVERRIDE
+//    {
+//#ifdef HAVE_VULKAN
+//        std::shared_ptr<vkcom::OpBase> op(new vkcom::OpLRN(size / 2, bias, alpha, beta, normBySize));
+//        return Ptr<BackendNode>(new VkComBackendNode(inputs, op));
+//#endif
+//        return Ptr<BackendNode>();
+//    }
 
     virtual Ptr<BackendNode> initHalide(const std::vector<Ptr<BackendWrapper> > &inputs) CV_OVERRIDE
     {

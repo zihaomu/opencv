@@ -327,16 +327,16 @@ public:
     }
 #endif
 
-    virtual Ptr<BackendNode> initVkCom(const std::vector<Ptr<BackendWrapper> > &inputs) CV_OVERRIDE
-    {
-#ifdef HAVE_VULKAN
-        vkcom::Tensor in = VkComTensor(inputs[0]);
-        int cAxis = normalize_axis(axisRaw, in.dimNum());
-        std::shared_ptr<vkcom::OpBase> op(new vkcom::OpSoftmax(cAxis, logSoftMax));
-        return Ptr<BackendNode>(new VkComBackendNode(inputs, op));
-#endif  // HAVE_VULKAN
-        return Ptr<BackendNode>();
-    }
+//    virtual Ptr<BackendNode> initVkCom(const std::vector<Ptr<BackendWrapper> > &inputs) CV_OVERRIDE
+//    {
+//#ifdef HAVE_VULKAN
+//        vkcom::Tensor in = VkComTensor(inputs[0]);
+//        int cAxis = normalize_axis(axisRaw, in.dimNum());
+//        std::shared_ptr<vkcom::OpBase> op(new vkcom::OpSoftmax(cAxis, logSoftMax));
+//        return Ptr<BackendNode>(new VkComBackendNode(inputs, op));
+//#endif  // HAVE_VULKAN
+//        return Ptr<BackendNode>();
+//    }
 
 
     virtual Ptr<BackendNode> initHalide(const std::vector<Ptr<BackendWrapper> > &inputs) CV_OVERRIDE

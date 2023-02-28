@@ -25,15 +25,18 @@
 #include "../vulkan/vk_functions.hpp"
 #include "../include/vkcom.hpp"
 #include "../shader/spv_shader.hpp"
+//#include "../vulkan/vk_functions.hpp"
+//#include "../vulkan/vk_loader.hpp"
 
 namespace cv { namespace dnn { namespace vkcom {
 
 #ifdef HAVE_VULKAN
-extern VkPhysicalDevice kPhysicalDevice;
-extern VkDevice kDevice;
 extern VkQueue kQueue;
-extern VkCommandPool kCmdPool;
+extern VkDevice kDevice;
 extern cv::Mutex kContextMtx;
+extern Ptr<CommandPool> cmdPoolPtr;
+extern Ptr<PipelineFactory> pipelineFactoryPtr;
+extern VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProperties;
 
 enum ShapeIdx
 {
@@ -80,6 +83,9 @@ enum ShapeIdx
     } \
 }
 
+bool checkFormat(Format fmt);
+size_t elementSize(Format fmt);
+int shapeCount(const Shape& shape, int start = -1, int end = -1);
 #endif // HAVE_VULKAN
 
 }}} // namespace cv::dnn::vkcom

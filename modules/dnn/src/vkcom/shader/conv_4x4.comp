@@ -1,0 +1,148 @@
+#version 450
+
+#define VEC_LEN 4
+layout(binding = 0) readonly buffer Input0{
+    vec4 input_data[]; // repack data, the shape is [ng, ceil(H0*W0/4), p.CgHkWk, 4]
+};
+layout(binding = 1) readonly buffer Input1 {
+    vec4 weight_data[]; // the shape is [g, ceil(K/4), p.CgHkWk, 4]
+};
+layout(binding = 2) buffer Input2 {
+    float bias_data[]; // the shape is [ceil(K/4)*4]
+};
+layout(binding = 3) buffer Output{
+    float output_data[]; // the shape is [batch, K, Hi, Wi].
+};
+
+layout(push_constant) uniform pushBlock {
+    int out_h;
+    int out_w;
+    int CgHkWk;
+    int Kg;
+    int group;
+    int batch;
+} p;
+
+#define STORE_VEC4_TO_FLOAT(offset, dataVec4) \
+        output_data[offset] = dataVec4.x; \
+        output_data[offset + 1] = dataVec4.y; \
+        output_data[offset + 2] = dataVec4.z; \
+        output_data[offset + 3] = dataVec4.w
+
+// dynamic assign the local size xyz
+// layout(local_size_x_id = 21, local_size_y_id = 22, local_size_z_id = 23) in;
+// layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+void main()
+{
+    int gx = int(gl_GlobalInvocationID.x); // H0*W0/4 * Kg/4
+    int gz = int(gl_GlobalInvocationID.y); // batch * group
+
+    int out_plane = p.out_h * p.out_w;
+    int out_plane_strip = (out_plane + VEC_LEN - 1)/VEC_LEN;
+    int out_plane_aligned = out_plane_strip * VEC_LEN;
+
+    int Kg4_i = gx/out_plane_strip;
+    int out_strips = gx - Kg4_i * out_plane_strip;
+
+//    int gy = int(gl_GlobalInvocationID.y); // Kg/4, output channle
+    int batchi = gz / p.group;
+    int groupi = gz - batchi * p.group;
+
+    int outChannle = Kg4_i * VEC_LEN;
+    int outIndex = out_strips * VEC_LEN;
+
+    int remainLenK = p.Kg - outChannle;
+    int remainLenHW = out_plane - outIndex;
+    int Kg_aligned = (p.Kg + VEC_LEN - 1)/VEC_LEN * VEC_LEN;
+
+    // TODEL
+//    vec4 weightVec4 = weight_data[gx];
+//    vec4 inputVec4 = input_data[gx];
+//    STORE_VEC4_TO_FLOAT((gx*2 + 1)* VEC_LEN, inputVec4);
+
+//    STORE_VEC4_TO_FLOAT(0, aa);
+//    if (outChannle < p.Kg && outIndex < out_plane && gz < p.batch * p.group)
+    if (outChannle < p.Kg && outIndex < out_plane && gz < p.batch * p.group)
+    {
+//        vec4 aa = vec4(1.f, 1.f, 1.f, 0);
+//        vec4 bb = aa * 2.f;
+//        STORE_VEC4_TO_FLOAT(gx * 4, bb);
+
+        int out_offset = gz * out_plane * p.Kg + outChannle * out_plane + outIndex;
+        int in_offset = gz * out_plane_strip * p.CgHkWk + out_strips * p.CgHkWk;
+        int weight_offset = (groupi * Kg_aligned * p.CgHkWk + outChannle * p.CgHkWk) / VEC_LEN;
+
+        int bias_offset = groupi * p.Kg + outChannle;
+        vec4 sum0 = vec4(bias_data[bias_offset]);
+        vec4 sum1 = vec4(bias_data[bias_offset + 1]);
+        vec4 sum2 = vec4(bias_data[bias_offset + 2]);
+        vec4 sum3 = vec4(bias_data[bias_offset + 3]);
+//        vec4 sum0 = vec4(0.f);
+//        vec4 sum1 = vec4(0.f);
+//        vec4 sum2 = vec4(0.f);
+//        vec4 sum3 = vec4(0.f);
+
+        for (int i = 0; i < p.CgHkWk; i++)
+        {
+            vec4 weightVec4 = weight_data[weight_offset + i];
+            vec4 inputVec4 = input_data[in_offset + i];
+
+            sum0 += inputVec4 * weightVec4.x;
+            sum1 += inputVec4 * weightVec4.y;
+            sum2 += inputVec4 * weightVec4.z;
+            sum3 += inputVec4 * weightVec4.w;
+        }
+
+//        if(outIndex == 8)
+//        {
+//            int lenK = min(remainLenK, VEC_LEN);
+//            int lenHW = min(remainLenHW, VEC_LEN);
+//            mat4 sum4x4 = mat4(sum0, sum1, sum2, sum3);
+//            vec4 a = vec4(sum4x4[0][0], sum4x4[1][0], sum4x4[2][0], sum4x4[3][0]);
+//            vec4 b = vec4(lenK, lenHW, 0, 0);
+//            STORE_VEC4_TO_FLOAT((0)* VEC_LEN, a);
+//            STORE_VEC4_TO_FLOAT((1)* VEC_LEN, b);
+//        }
+
+//        vec4 weightVec4 = weight_data[weight_offset + 1];
+//        vec4 inputVec4 = input_data[in_offset];
+
+//        STORE_VEC4_TO_FLOAT(out_offset, weightVec4);
+//        STORE_VEC4_TO_FLOAT(out_offset + 1 * out_plane, weightVec4);
+
+        // TODO check if output should use the vec4 storage.???
+        if (remainLenHW >= VEC_LEN && remainLenK >= VEC_LEN)
+        {
+            STORE_VEC4_TO_FLOAT(out_offset, sum0);
+            STORE_VEC4_TO_FLOAT(out_offset + 1 * out_plane, sum1);
+            STORE_VEC4_TO_FLOAT(out_offset + 2 * out_plane, sum2);
+            STORE_VEC4_TO_FLOAT(out_offset + 3 * out_plane, sum3);
+//            output_data[out_offset] = sum0;
+//            output_data[out_offset + 1 * out_plane] = sum1;
+//            output_data[out_offset + 2 * out_plane] = sum2;
+//            output_data[out_offset + 3 * out_plane] = sum3;
+        }
+        else if (remainLenHW >= VEC_LEN)
+        {
+            mat4 sum4x4 = mat4(sum0, sum1, sum2, sum3);
+            for (int k = 0; k < remainLenK; k++)
+            {
+                STORE_VEC4_TO_FLOAT(out_offset + k * out_plane, sum4x4[k]);
+//                output_data[out_offset + k * out_plane] = sum4x4[k];
+            }
+        }
+        else
+        {
+            int lenK = min(remainLenK, VEC_LEN);
+            int lenHW = min(remainLenHW, VEC_LEN);
+            mat4 sum4x4 = mat4(sum0, sum1, sum2, sum3);
+            for (int k = 0; k < lenK; k++)
+            {
+                for (int hw = 0; hw < lenHW; hw++)
+                {
+                    output_data[out_offset + k * out_plane + hw] = sum4x4[k][hw];
+                }
+            }
+        }
+    }
+}

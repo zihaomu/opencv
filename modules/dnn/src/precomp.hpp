@@ -90,3 +90,5 @@
 #include <opencv2/dnn/shape_utils.hpp>
 
 #include "dnn_common.hpp"
+
+#define HAVE_VULKAN

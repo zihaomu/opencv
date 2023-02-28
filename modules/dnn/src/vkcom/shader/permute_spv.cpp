@@ -1,16 +1,13 @@
 // This file is part of OpenCV project.
 // It is subject to the license terms in the LICENSE file found in the top-level directory
 // of this distribution and at http://opencv.org/license.html.
-//
-// Copyright (C) 2018, Intel Corporation, all rights reserved.
-// Third party copyrights are property of their respective owners.
 
 #include "../../precomp.hpp"
 
 namespace cv { namespace dnn { namespace vkcom {
 
 extern const unsigned int permute_spv[765] = {
-    0x07230203,0x00010000,0x00080001,0x00000069,0x00000000,0x00020011,0x00000001,0x0006000b,
+    0x07230203,0x00010000,0x0008000b,0x00000069,0x00000000,0x00020011,0x00000001,0x0006000b,
     0x00000001,0x4c534c47,0x6474732e,0x3035342e,0x00000000,0x0003000e,0x00000000,0x00000001,
     0x0006000f,0x00000005,0x00000004,0x6e69616d,0x00000000,0x0000000c,0x00060010,0x00000004,
     0x00000011,0x00000100,0x00000001,0x00000001,0x00030003,0x00000002,0x000001c2,0x00040005,

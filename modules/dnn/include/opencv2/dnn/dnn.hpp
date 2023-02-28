@@ -314,7 +314,7 @@ CV__DNN_INLINE_NS_BEGIN
 
         virtual Ptr<BackendNode> initNgraph(const std::vector<Ptr<BackendWrapper> > &inputs, const std::vector<Ptr<BackendNode> >& nodes);
 
-        virtual Ptr<BackendNode> initVkCom(const std::vector<Ptr<BackendWrapper> > &inputs);
+        virtual Ptr<BackendNode> initVkCom(const std::vector<Ptr<BackendWrapper> > &inputs, std::vector<Ptr<BackendWrapper> > &outputs);
 
         virtual Ptr<BackendNode> initWebnn(const std::vector<Ptr<BackendWrapper> > &inputs, const std::vector<Ptr<BackendNode> >& nodes);
 
@@ -434,6 +434,15 @@ CV__DNN_INLINE_NS_BEGIN
                                const std::vector<MatShape> &outputs) const {CV_UNUSED(inputs); CV_UNUSED(outputs); return 0;}
 
         virtual bool updateMemoryShapes(const std::vector<MatShape> &inputs);
+
+        static void printTime();
+        static void resetTime();
+
+        static TickMeter t0;
+        static TickMeter t1;
+        static TickMeter t2;
+        static TickMeter t3;
+        static TickMeter t4;
 
         CV_PROP String name; //!< Name of the layer instance, can be used for logging or other internal purposes.
         CV_PROP String type; //!< Type name which was used for creating layer by layer factory.
@@ -1814,6 +1823,9 @@ public:
     CV_WRAP TextDetectionModel_DB& setMaxCandidates(int maxCandidates);
     CV_WRAP int getMaxCandidates() const;
 };
+
+void printShape(InputArray blob_);
+void printblob(InputArray blob_, int strip = 0);
 
 //! @}
 CV__DNN_INLINE_NS_END

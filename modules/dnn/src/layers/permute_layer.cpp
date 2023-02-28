@@ -510,14 +510,14 @@ public:
 #endif
 
 
-#ifdef HAVE_VULKAN
-    virtual Ptr<BackendNode> initVkCom(const std::vector<Ptr<BackendWrapper> > &input) CV_OVERRIDE
-    {
-        CV_Assert(!_order.empty());
-        std::shared_ptr<vkcom::OpBase> op(new vkcom::OpPermute(_order));
-        return Ptr<BackendNode>(new VkComBackendNode(input, op));
-    }
-#endif // HAVE_VULKAN
+//#ifdef HAVE_VULKAN
+//    virtual Ptr<BackendNode> initVkCom(const std::vector<Ptr<BackendWrapper> > &input) CV_OVERRIDE
+//    {
+//        CV_Assert(!_order.empty());
+//        std::shared_ptr<vkcom::OpBase> op(new vkcom::OpPermute(_order));
+//        return Ptr<BackendNode>(new VkComBackendNode(input, op));
+//    }
+//#endif // HAVE_VULKAN
 
 #ifdef HAVE_TIMVX
   virtual Ptr<BackendNode> initTimVX(void* timVXInfo_,

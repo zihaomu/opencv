@@ -1,0 +1,37 @@
+#version 450
+
+layout(binding = 0) writeonly buffer Output{
+    float outputData[];
+};
+
+layout(binding = 1) uniform pushBlock {
+    int in_h;
+    int in_w;
+    int out_h;
+    int out_w;
+    int stride_h;
+    int stride_w;
+    int pad_h;
+    int pad_w;
+    int filter_h;
+    int filter_w;
+    int dilation_h;
+    int dilation_w;
+    int channels;
+    int batch;
+    int has_bias;
+    int M;
+    int K;
+    int N;
+    int basic_shader_batch_idx;      // what's this ？
+    int basic_shader_partition_idx;  //
+    int basic_shader_partition_size; // what's this？
+} p;
+
+void main()
+{
+    for (int i = 0; i < 20; i++)
+    {
+        outputData[i] = p.in_w;
+    }
+}
