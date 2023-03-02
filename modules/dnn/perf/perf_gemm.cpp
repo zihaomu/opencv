@@ -88,9 +88,7 @@ PERF_TEST_P_(Gemm, gemm2D)
     Backend backendId = get<0>(get<1>(GetParam()));
     Target targetId = get<1>(get<1>(GetParam()));
 
-    if (
-            targetId != DNN_TARGET_CPU &&
-    targetId != DNN_TARGET_VULKAN)
+    if (targetId != DNN_TARGET_CPU && targetId != DNN_TARGET_VULKAN)
         throw SkipTestException("Only CPU and Vulkan are supported");
 
     Mat input0(2, &inputShape0[0], CV_32F);

@@ -28,6 +28,8 @@ void initSPVMaps()
     SPVMaps.insert(std::make_pair("dw_conv_spv", std::make_pair(dw_conv_spv, 1762)));
     SPVMaps.insert(std::make_pair("concat_spv", std::make_pair(concat_spv, 541)));
     SPVMaps.insert(std::make_pair("avg_pool_spv", std::make_pair(avg_pool_spv, 1538)));
+    SPVMaps.insert(std::make_pair("gemm_v2_spv", std::make_pair(gemm_v2_spv, 1478)));
+    SPVMaps.insert(std::make_pair("gemm_v3_spv", std::make_pair(gemm_v3_spv, 1648)));
 }
 
 }}} // namespace cv::dnn::vkcom

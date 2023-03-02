@@ -25,6 +25,8 @@ extern const unsigned int moo_test_spv[1066];
 extern const unsigned int dw_conv_spv[1762];
 extern const unsigned int concat_spv[541];
 extern const unsigned int avg_pool_spv[1538];
+extern const unsigned int gemm_v2_spv[1478];
+extern const unsigned int gemm_v3_spv[1648];
 
 extern std::map<std::string, std::pair<const unsigned int *, size_t> > SPVMaps;
 

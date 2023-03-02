@@ -101,10 +101,10 @@ public:
             net.setInput(inps[i], inputNames[i]);
         Mat out = net.forward("");
 
-        std::cout<<"ref = "<<std::endl;
-        printblob(ref);
-        std::cout<<"out = "<<std::endl;
-        printblob(out);
+//        std::cout<<"ref = "<<std::endl;
+//        printblob(ref);
+//        std::cout<<"out = "<<std::endl;
+//        printblob(out);
 
 //        cv::TickMeter ticker;
 //        std::vector<double> times;

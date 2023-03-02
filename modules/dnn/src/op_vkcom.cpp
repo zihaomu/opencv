@@ -200,6 +200,7 @@ bool VkComBackendNode::forward()
 VkComBackendWrapper::VkComBackendWrapper(Mat& m) : BackendWrapper(DNN_BACKEND_VKCOM, DNN_TARGET_VULKAN)
 {
     // TODO! remove the copyToTensor here, we will do copy later.
+    CV_Assert(m.isContinuous());
     copyToTensor(tensor, m);
     host = &m;
     hostDirty = false;
