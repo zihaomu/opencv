@@ -86,6 +86,8 @@ enum ShapeIdx
 bool checkFormat(Format fmt);
 size_t elementSize(Format fmt);
 int shapeCount(const Shape& shape, int start = -1, int end = -1);
+void setXYZ(unsigned int* dstcode, const unsigned int* code, const size_t size,
+            uint32_t local_size_x, uint32_t local_size_y, uint32_t local_size_z, size_t* dstsize);
 #endif // HAVE_VULKAN
 
 }}} // namespace cv::dnn::vkcom

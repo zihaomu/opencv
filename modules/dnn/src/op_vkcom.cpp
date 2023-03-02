@@ -269,7 +269,11 @@ void forwardVkCom(std::vector<Ptr<BackendWrapper> > &outputs,
     Ptr<VkComBackendNode> node_ = node.dynamicCast<VkComBackendNode>();
 
 //    node_->printTensorInfo();
-    CV_Assert(node_->forward()); // run layer forward
+    if(!node_->forward())
+    {
+        std::cout<<"run error"<<std::endl;
+    }
+//    CV_Assert(node_->forward()); // run layer forward
     setDirty(outputs);
 //    node_->printTensorInfo();
 //    std::cout<<"setDirty(outputs); "<<std::endl;

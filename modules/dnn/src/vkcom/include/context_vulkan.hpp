@@ -19,7 +19,7 @@ namespace cv { namespace dnn { namespace vkcom {
 #ifdef HAVE_VULKAN
 
 // NOTE: Manually set true to enable ValidationLayers, default is false.
-const bool enableValidationLayers = true;
+const bool enableValidationLayers = false;
 
 enum GPU_TYPE {
     GPU_TYPE_NOFOUND = -1,

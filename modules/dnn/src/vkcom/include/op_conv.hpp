@@ -43,7 +43,7 @@ public:
            const int stride_h, const int stride_w, const int dilation_h, const int dilation_w,
            const int pad_left, const int pad_top, bool fusedAdd);
 
-    bool forward(Tensor& in, Tensor& filter_weights, Tensor& bias, Tensor& out);
+//    bool forward(Tensor& in, Tensor& filter_weights, Tensor& bias, Tensor& out);
     virtual bool forward(std::vector<Tensor>& ins, std::vector<Tensor>& outs) CV_OVERRIDE;
     Ptr<Tensor> weightTensorPtr;
     Ptr<Tensor> biasTensorPtr;

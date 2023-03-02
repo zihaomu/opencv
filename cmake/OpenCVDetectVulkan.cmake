@@ -2,15 +2,23 @@
 #set(VULKAN_LIBRARIES "")
 
 # Ubuntu
-set(VULKAN_INCLUDE_DIRS "/home/moo/vulkan_sdk/1.3.236.0/x86_64/include" CACHE PATH "Vulkan include directory")
-set(VULKAN_LIBRARIES_DIRS "/home/moo/vulkan_sdk/1.3.236.0/x86_64/lib" CACHE PATH "Path to Vulkan Libraries.")
+#set(VULKAN_INCLUDE_DIRS "/home/moo/vulkan_sdk/1.3.236.0/x86_64/include" CACHE PATH "Vulkan include directory")
+#set(VULKAN_LIBRARIES_DIRS "/home/moo/vulkan_sdk/1.3.236.0/x86_64/lib" CACHE PATH "Path to Vulkan Libraries.")
 
 # MacOS
-#set(VULKAN_INCLUDE_DIRS "/Users/zihao/VulkanSDK/1.3.231.1/MoltenVK/include" CACHE PATH "Vulkan include directory")
-#set(VULKAN_LIBRARIES_DIRS "/Users/zihao/VulkanSDK/1.3.231.1/MoltenVK/dylib/macOS" CACHE PATH "Path to Vulkan Libraries.")
+set(VULKAN_INCLUDE_DIRS "/Users/zihao/VulkanSDK/1.3.231.1/MoltenVK/include" CACHE PATH "Vulkan include directory")
+set(VULKAN_LIBRARIES_DIRS "/Users/zihao/VulkanSDK/1.3.231.1/MoltenVK/dylib/macOS" CACHE PATH "Path to Vulkan Libraries.")
 
-
-find_library(VULKAN_LIBRARIES vulkan PATHS ${VULKAN_LIBRARIES_DIRS} NO_DEFAULT_PATH)
+# For Apple ARM, we use MoltenVK to call vulkan library.
+if(CMAKE_HOST_SYSTEM_NAME MATCHES Darwin AND CMAKE_HOST_SYSTEM_PROCESSOR MATCHES arm64)
+  # TODEL
+  message("Find lib at MoltenVK")
+  find_library(VULKAN_LIBRARIES MoltenVK PATHS ${VULKAN_LIBRARIES_DIRS} NO_DEFAULT_PATH)
+else()
+  # TODEL
+  message("Find lib at Vulkan")
+  find_library(VULKAN_LIBRARIES vulkan PATHS ${VULKAN_LIBRARIES_DIRS} NO_DEFAULT_PATH)
+endif()
 
 if(NOT VULKAN_LIBRARIES)
   message("Please Set right VULKAN_LIBRARIES_DIRS")

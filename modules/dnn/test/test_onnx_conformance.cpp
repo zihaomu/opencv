@@ -30,6 +30,42 @@ struct TestCase
     uint32_t outputs;
 };
 
+    void printblob(InputArray blob_) {
+        Mat blob = blob_.getMat();
+        auto shapeV = shape(blob);
+        auto typeMat = blob.type();
+//            std::cout<<"blob ptr = "<<blob.data<<std::endl;
+        std::cout << "data type = " << typeMat << std::endl;
+        float *ptrf;
+        uchar *ptru;
+        char *ptrc;
+        int* ptrs;
+        int len = std::min(int(blob.total()), 1000);
+        if (typeMat == 0) {
+            ptru = (uchar *) blob.data;
+            for (int i = 0; i < len; i++) {
+                std::cout << (int) *(ptru + i) << ", ";
+            }
+        }else if (typeMat == 1) {
+            ptrc = (char *)blob.data;
+            for(int i = 0; i<len; i++) {
+                std::cout<<(int) *(ptrc + i)<<", ";}
+
+        }else if (typeMat == 4) {
+            ptrs = (int *)blob.data;
+            for(int i = 0; i<len; i++) {
+                std::cout<<(int) *(ptrs + i)<<", ";}
+
+        }
+        else if (typeMat == 5) {
+            ptrf = (float *)blob.data;
+            for(int i = 0; i<len; i++) {
+                std::cout<<*(ptrf + i)<<", ";
+            }
+        }
+        std::cout<<std::endl;
+    }
+
 static const TestCase testConformanceConfig[] = {
     {"test_abs", 1, 1},
     {"test_acos", 1, 1},
@@ -1189,6 +1225,7 @@ TEST_P(Test_ONNX_conformance, Layer_Test)
     try
     {
         net.forward(outputs, layerNames);
+
     }
     catch (...)
     {
@@ -1211,6 +1248,10 @@ TEST_P(Test_ONNX_conformance, Layer_Test)
             {
                 // probably we found random unconnected layers.
                 normAssert(ref_outputs[0], outputs[0], "", default_l1, default_lInf);
+                std::cout<<"ref = "<<std::endl;
+                printblob(ref_outputs[0]);
+                std::cout<<"out = "<<std::endl;
+                printblob(outputs[0]);
             }
             else
             {

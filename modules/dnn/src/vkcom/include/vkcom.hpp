@@ -35,6 +35,7 @@ enum OpType {
     kOpTypePriorBox,
     kOpTypePermute,
     kOpTypeConvInternel,
+    kOpTypeMatMul,
 };
 
 enum PaddingMode { kPaddingModeSame = -1, kPaddingModeValid, kPaddingModeCaffe, kPaddingModeNum };
@@ -60,6 +61,7 @@ bool isAvailable();
 // layer
 #include "op_base.hpp"
 #include "op_conv.hpp"
+#include "op_matmul.hpp"
 //#include "op_concat.hpp"
 //#include "op_lrn.hpp"
 //#include "op_softmax.hpp"

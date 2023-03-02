@@ -78,6 +78,7 @@ Mat _InputArray::getMat_(int i) const
     if( k == STD_VECTOR_MAT )
     {
         const std::vector<Mat>& v = *(const std::vector<Mat>*)obj;
+        if (!( 0 <= i && i < (int)v.size() ))
         CV_Assert( 0 <= i && i < (int)v.size() );
 
         return v[i];
