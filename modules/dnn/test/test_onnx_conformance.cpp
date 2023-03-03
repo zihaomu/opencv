@@ -1248,10 +1248,10 @@ TEST_P(Test_ONNX_conformance, Layer_Test)
             {
                 // probably we found random unconnected layers.
                 normAssert(ref_outputs[0], outputs[0], "", default_l1, default_lInf);
-//                std::cout<<"ref = "<<std::endl;
-//                printblob(ref_outputs[0]);
-//                std::cout<<"out = "<<std::endl;
-//                printblob(outputs[0]);
+                std::cout<<"ref = "<<std::endl;
+                printblob(ref_outputs[0]);
+                std::cout<<"out = "<<std::endl;
+                printblob(outputs[0]);
             }
             else
             {

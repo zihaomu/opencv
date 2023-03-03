@@ -22,6 +22,7 @@ void initSPVMaps()
     SPVMaps.insert(std::make_pair("conv_spv", std::make_pair(conv_spv, 1904)));
     SPVMaps.insert(std::make_pair("softmax_spv", std::make_pair(softmax_spv, 1496)));
     SPVMaps.insert(std::make_pair("conv_4x4_spv", std::make_pair(conv_4x4_spv, 3000)));
+    SPVMaps.insert(std::make_pair("gemm_v4_spv", std::make_pair(gemm_v4_spv, 2580)));
     SPVMaps.insert(std::make_pair("conv_in_repack_spv", std::make_pair(conv_in_repack_spv, 2227)));
     SPVMaps.insert(std::make_pair("moo_test2_spv", std::make_pair(moo_test2_spv, 494)));
     SPVMaps.insert(std::make_pair("moo_test_spv", std::make_pair(moo_test_spv, 1066)));
