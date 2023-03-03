@@ -24,8 +24,8 @@ layout(binding = 3) uniform pushBlock {
 shared float ashare[BLOCK_SIZE][BLOCK_SIZE];
 shared float bshare[BLOCK_SIZE][BLOCK_SIZE];
 
-shared vec4 amatrix[BLOCK_SIZE][4];
-shared vec4 bmatrix[BLOCK_SIZE][4];
+shared vec4 amatrix[2][BLOCK_SIZE][4];
+shared vec4 bmatrix[2][BLOCK_SIZE][4];
 
 layout(local_size_x = BLOCK_SIZE, local_size_y = BLOCK_SIZE, local_size_z = 1) in;
 void main()
@@ -50,19 +50,33 @@ void main()
     int matrixIndex = local_x/4;
     int inIndex = local_x - matrixIndex*4;
 
-    for (int i = 0; i < p.KStrip; i++)
+    amatrix[0][local_y][matrixIndex][inIndex] = image_data[aoffset + local_x + local_y * p.K];
+    bmatrix[0][local_y][matrixIndex][inIndex] = weight_data[boffset + local_y + local_x * p.N];
+
+    for (int i = 1; i < p.KStrip; i++)
     {
-        amatrix[local_y][matrixIndex][inIndex] = image_data[aoffset + i * BLOCK_SIZE + local_x + local_y * p.K];
-        bmatrix[local_y][matrixIndex][inIndex] = weight_data[boffset + local_y + i * BLOCK_SIZE + local_x * p.N];
+        barrier();
+        amatrix[1][local_y][matrixIndex][inIndex] = image_data[aoffset + i * BLOCK_SIZE + local_x + local_y * p.K];
+        bmatrix[1][local_y][matrixIndex][inIndex] = weight_data[boffset + local_y + i * BLOCK_SIZE + local_x * p.N];
+
+        sum += dot(amatrix[0][local_x][0],  bmatrix[0][local_y][0]);
+        sum += dot(amatrix[0][local_x][1],  bmatrix[0][local_y][1]);
+        sum += dot(amatrix[0][local_x][2],  bmatrix[0][local_y][2]);
+        sum += dot(amatrix[0][local_x][3],  bmatrix[0][local_y][3]);
 
         barrier();
 
-        sum += dot(amatrix[local_x][0],  bmatrix[local_y][0]);
-        sum += dot(amatrix[local_x][1],  bmatrix[local_y][1]);
-        sum += dot(amatrix[local_x][2],  bmatrix[local_y][2]);
-        sum += dot(amatrix[local_x][3],  bmatrix[local_y][3]);
+        i++;
+        if (i < p.KStrip)
+        {
+            amatrix[0][local_y][matrixIndex][inIndex] = image_data[aoffset + i * BLOCK_SIZE + local_x + local_y * p.K];
+            bmatrix[0][local_y][matrixIndex][inIndex] = weight_data[boffset + local_y + i * BLOCK_SIZE + local_x * p.N];
+        }
 
-        barrier();
+        sum += dot(amatrix[1][local_x][0],  bmatrix[1][local_y][0]);
+        sum += dot(amatrix[1][local_x][1],  bmatrix[1][local_y][1]);
+        sum += dot(amatrix[1][local_x][2],  bmatrix[1][local_y][2]);
+        sum += dot(amatrix[1][local_x][3],  bmatrix[1][local_y][3]);
     }
 
     if (p.KStripRemain > 0)

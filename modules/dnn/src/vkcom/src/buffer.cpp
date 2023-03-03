@@ -50,7 +50,7 @@ bool Buffer::init(size_t size_in_bytes, const char* data)
     allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocateInfo.allocationSize = memoryRequirements.size;
     allocateInfo.memoryTypeIndex = findMemoryType(memoryRequirements.memoryTypeBits,
-//                                                  VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
+                                                  VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
 //                                                  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
                                                   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
                                                   );
