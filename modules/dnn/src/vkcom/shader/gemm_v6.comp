@@ -1,20 +1,14 @@
 #version 450
-
-/* The difference between the V4 and V5 is the value of BLOCK_SIZE and STRIDE.
-    And the V5 is same as V4, and they are all slower than V3.
-*/
-
-#define BLOCK_SIZE 8
-#define STRIDE 4
-
-#define STEP (BLOCK_SIZE * STRIDE)
+#define BLOCK_SIZE 16
 
 layout(binding = 0) readonly buffer Input0{
     float image_data[];
 };
+
 layout(binding = 1) readonly buffer Input1 {
     float weight_data[];
 };
+
 layout(binding = 2) writeonly buffer Output{
     float outMat_data[];
 };
@@ -27,8 +21,11 @@ layout(binding = 3) uniform pushBlock {
     int KStripRemain;
 } p;
 
-shared float ashare[STEP][STEP];
-shared float bshare[STEP][STEP];
+shared float ashare[BLOCK_SIZE][BLOCK_SIZE];
+shared float bshare[BLOCK_SIZE][BLOCK_SIZE];
+
+shared vec4 amatrix[2][BLOCK_SIZE][4];
+shared vec4 bmatrix[2][BLOCK_SIZE][4];
 
 layout(local_size_x = BLOCK_SIZE, local_size_y = BLOCK_SIZE, local_size_z = 1) in;
 void main()
@@ -39,95 +36,69 @@ void main()
     int global_x = int(gl_WorkGroupID.x);
     int global_y = int(gl_WorkGroupID.y);
 
-    int mIndex = global_x * STEP;
-    int nIndex = global_y * STEP;
+    int mIndex = global_x * BLOCK_SIZE;
+    int nIndex = global_y * BLOCK_SIZE;
 
     int aoffset = p.K * mIndex;
     int boffset = nIndex;
 
-    mat4 sum = {0.f, 0.f, 0.f, 0.f};
+    float sum = 0.;
     // TODO! if MxN is not BLOCK,??
     // if Kstrip is not BLOCK ??
 
     // check if the KStrip is not BLOCK
+    int matrixIndex = local_x/4;
+    int inIndex = local_x - matrixIndex*4;
 
-    int local_y_STRIDE = local_y * STRIDE;
-    int local_x_STRIDE = local_x * STRIDE;
+    amatrix[0][local_y][matrixIndex][inIndex] = image_data[aoffset + local_x + local_y * p.K];
+    bmatrix[0][local_y][matrixIndex][inIndex] = weight_data[boffset + local_y + local_x * p.N];
 
-    for (int i = 0; i < p.KStrip; i++)
+    for (int i = 1; i < p.KStrip; i++)
     {
-        for (int y = 0; y < STRIDE; y++)
-        {
-            for (int x = 0; x < STRIDE; x++)
-            {
-                int local_y_1 = local_y_STRIDE + y;
-                int local_x_1 = local_x_STRIDE + x;
+        barrier();
+        amatrix[1][local_y][matrixIndex][inIndex] = image_data[aoffset + i * BLOCK_SIZE + local_x + local_y * p.K];
+        bmatrix[1][local_y][matrixIndex][inIndex] = weight_data[boffset + local_y + i * BLOCK_SIZE + local_x * p.N];
 
-                ashare[local_y_1][local_x_1] = image_data[aoffset + i * STEP+local_x_1+local_y_1*p.K];
-                bshare[local_y_1][local_x_1] = weight_data[boffset + local_y_1 + i*STEP + local_x_1*p.N];
-            }
-        }
+        sum += dot(amatrix[0][local_x][0],  bmatrix[0][local_y][0]);
+        sum += dot(amatrix[0][local_x][1],  bmatrix[0][local_y][1]);
+        sum += dot(amatrix[0][local_x][2],  bmatrix[0][local_y][2]);
+        sum += dot(amatrix[0][local_x][3],  bmatrix[0][local_y][3]);
 
         barrier();
 
-        for (int y = 0; y < STRIDE; y++)
+        i++;
+        if (i < p.KStrip)
         {
-            for (int x = 0; x < STRIDE; x++)
-            {
-                for (int k = 0; k < STEP; k++)
-                {
-                    sum[x][y] += ashare[local_x_STRIDE + x][k] * bshare[local_y_STRIDE + y][k];
-                }
-            }
+            amatrix[0][local_y][matrixIndex][inIndex] = image_data[aoffset + i * BLOCK_SIZE + local_x + local_y * p.K];
+            bmatrix[0][local_y][matrixIndex][inIndex] = weight_data[boffset + local_y + i * BLOCK_SIZE + local_x * p.N];
         }
 
-        barrier();
+        sum += dot(amatrix[1][local_x][0],  bmatrix[1][local_y][0]);
+        sum += dot(amatrix[1][local_x][1],  bmatrix[1][local_y][1]);
+        sum += dot(amatrix[1][local_x][2],  bmatrix[1][local_y][2]);
+        sum += dot(amatrix[1][local_x][3],  bmatrix[1][local_y][3]);
     }
 
     if (p.KStripRemain > 0)
     {
-        int aoffset2 = aoffset + p.KStrip * STEP;
-        int boffset2 = boffset + p.KStrip * STEP * p.N;
+        int aoffset2 = aoffset + p.KStrip * BLOCK_SIZE;
+        int boffset2 = boffset + p.KStrip * BLOCK_SIZE * p.N;
 
         // NOTE: Calculations beyond the index are meaningless
-        for (int y = 0; y < STRIDE; y++)
-        {
-            for (int x = 0; x < STRIDE; x++)
-            {
-                int local_y_1 = local_y_STRIDE + y;
-                int local_x_1 = local_x_STRIDE + x;
-
-                ashare[local_y_1][local_x_1] = image_data[aoffset2 + local_x_1 + local_y_1 * p.K];
-                bshare[local_y_1][local_x_1] = weight_data[boffset2 + local_y_1 + local_x_1 * p.N];
-            }
-        }
+        ashare[local_y][local_x] = image_data[aoffset2 + local_x + local_y * p.K];
+        bshare[local_y][local_x] = weight_data[boffset2 + local_y + local_x * p.N];
 
         barrier();
 
-        for (int y = 0; y < STRIDE; y++)
+        for (int k = 0; k < p.KStripRemain; k++)
         {
-            for (int x = 0; x < STRIDE; x++)
-            {
-                for (int k = 0; k < p.KStripRemain; k++)
-                {
-                    sum[x][y] += ashare[local_x_STRIDE + x][k] * bshare[local_y_STRIDE + y][k];
-                }
-            }
+            sum += ashare[local_x][k] * bshare[local_y][k];
         }
     }
 
-    mIndex += local_x_STRIDE;
-    nIndex += local_y_STRIDE;
+    mIndex += local_x;
+    nIndex += local_y;
 
-    for (int y = 0; y < STRIDE; y++)
-    {
-        for (int x = 0; x < STRIDE; x++)
-        {
-            int nIndex1 = nIndex + x;
-            int mIndex1 = mIndex + y;
-
-            if (mIndex1 < p.M && nIndex1 < p.N)
-            outMat_data[mIndex1 * p.N + nIndex1] = sum[y][x];
-        }
-    }
+    if (mIndex < p.M && nIndex < p.N)
+    outMat_data[mIndex * p.N + nIndex] = sum;
 }

@@ -17,7 +17,7 @@ void initSPVMaps()
     SPVMaps.insert(std::make_pair("relu_spv", std::make_pair(relu_spv, 502)));
     SPVMaps.insert(std::make_pair("prior_box_spv", std::make_pair(prior_box_spv, 1480)));
     SPVMaps.insert(std::make_pair("conv48_nobias_spv", std::make_pair(conv48_nobias_spv, 7182)));
-    SPVMaps.insert(std::make_pair("gemm_v6_spv", std::make_pair(gemm_v6_spv, 2389)));
+    SPVMaps.insert(std::make_pair("gemm_v6_spv", std::make_pair(gemm_v6_spv, 2197)));
     SPVMaps.insert(std::make_pair("permute_spv", std::make_pair(permute_spv, 765)));
     SPVMaps.insert(std::make_pair("conv48_spv", std::make_pair(conv48_spv, 7458)));
     SPVMaps.insert(std::make_pair("gemm_spv", std::make_pair(gemm_spv, 753)));
