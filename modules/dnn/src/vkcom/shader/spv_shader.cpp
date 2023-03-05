@@ -17,13 +17,13 @@ void initSPVMaps()
     SPVMaps.insert(std::make_pair("relu_spv", std::make_pair(relu_spv, 502)));
     SPVMaps.insert(std::make_pair("prior_box_spv", std::make_pair(prior_box_spv, 1480)));
     SPVMaps.insert(std::make_pair("conv48_nobias_spv", std::make_pair(conv48_nobias_spv, 7182)));
-    SPVMaps.insert(std::make_pair("gemm_v6_spv", std::make_pair(gemm_v6_spv, 2197)));
+    SPVMaps.insert(std::make_pair("gemm_v6_spv", std::make_pair(gemm_v6_spv, 1532)));
     SPVMaps.insert(std::make_pair("permute_spv", std::make_pair(permute_spv, 765)));
     SPVMaps.insert(std::make_pair("conv48_spv", std::make_pair(conv48_spv, 7458)));
     SPVMaps.insert(std::make_pair("gemm_spv", std::make_pair(gemm_spv, 753)));
     SPVMaps.insert(std::make_pair("conv_spv", std::make_pair(conv_spv, 1904)));
     SPVMaps.insert(std::make_pair("softmax_spv", std::make_pair(softmax_spv, 1496)));
-    SPVMaps.insert(std::make_pair("gemm_v7_spv", std::make_pair(gemm_v7_spv, 349)));
+    SPVMaps.insert(std::make_pair("gemm_v7_spv", std::make_pair(gemm_v7_spv, 1478)));
     SPVMaps.insert(std::make_pair("conv_4x4_spv", std::make_pair(conv_4x4_spv, 3000)));
     SPVMaps.insert(std::make_pair("gemm_v4_spv", std::make_pair(gemm_v4_spv, 2580)));
     SPVMaps.insert(std::make_pair("conv_in_repack_spv", std::make_pair(conv_in_repack_spv, 2227)));
@@ -31,7 +31,7 @@ void initSPVMaps()
     SPVMaps.insert(std::make_pair("moo_test2_spv", std::make_pair(moo_test2_spv, 494)));
     SPVMaps.insert(std::make_pair("gemm_v9_spv", std::make_pair(gemm_v9_spv, 349)));
     SPVMaps.insert(std::make_pair("moo_test_spv", std::make_pair(moo_test_spv, 1066)));
-    SPVMaps.insert(std::make_pair("gemm_v5_spv", std::make_pair(gemm_v5_spv, 2382)));
+    SPVMaps.insert(std::make_pair("gemm_v5_spv", std::make_pair(gemm_v5_spv, 349)));
     SPVMaps.insert(std::make_pair("dw_conv_spv", std::make_pair(dw_conv_spv, 1762)));
     SPVMaps.insert(std::make_pair("concat_spv", std::make_pair(concat_spv, 541)));
     SPVMaps.insert(std::make_pair("avg_pool_spv", std::make_pair(avg_pool_spv, 1538)));

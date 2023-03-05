@@ -1,9 +1,7 @@
 #version 450
-
 #define BLOCK_SIZE 16
-#define STRIDE 2
 
-#define STEP (BLOCK_SIZE * STRIDE)
+// Experiment Row major VS column major.
 
 layout(binding = 0) readonly buffer Input0{
     float image_data[];
@@ -23,11 +21,86 @@ layout(binding = 3) uniform pushBlock {
     int KStripRemain;
 } p;
 
-shared float ashare[STEP][STEP];
-shared float bshare[STEP][STEP];
+shared float ashare[BLOCK_SIZE][BLOCK_SIZE];
+shared float bshare[BLOCK_SIZE][BLOCK_SIZE];
 
 layout(local_size_x = BLOCK_SIZE, local_size_y = BLOCK_SIZE, local_size_z = 1) in;
 void main()
 {
-    // empty
+    int local_x = int(gl_LocalInvocationID.x);
+    int local_y = int(gl_LocalInvocationID.y);
+
+    int global_x = int(gl_WorkGroupID.x);
+    int global_y = int(gl_WorkGroupID.y);
+
+    int mIndex = global_x * BLOCK_SIZE;
+    int nIndex = global_y * BLOCK_SIZE;
+
+    int aoffset = p.K * mIndex;
+    int boffset = nIndex;
+
+    float sum = 0.;
+    // TODO! if MxN is not BLOCK,??
+    // if Kstrip is not BLOCK ??
+
+    // check if the KStrip is not BLOCK
+    for (int i = 0; i < p.KStrip; i++)
+    {
+        ashare[local_y][local_x] = image_data[aoffset + i * BLOCK_SIZE+local_x+local_y*p.K];
+        bshare[local_y][local_x] = weight_data[boffset + local_y + i*BLOCK_SIZE + local_x*p.N];
+
+        barrier();
+
+        for (int k = 0; k < BLOCK_SIZE; k++)
+        {
+            sum += ashare[local_x][k] * bshare[local_y][k];
+        }
+
+        barrier();
+    }
+
+    if (p.KStripRemain > 0)
+    {
+        int aoffset2 = aoffset + p.KStrip * BLOCK_SIZE;
+        int boffset2 = boffset + p.KStrip * BLOCK_SIZE * p.N;
+
+        // NOTE: Calculations beyond the index are meaningless
+        ashare[local_y][local_x] = image_data[aoffset2 + local_x + local_y * p.K];
+        bshare[local_y][local_x] = weight_data[boffset2 + local_y + local_x * p.N];
+
+        barrier();
+
+        for (int k = 0; k < p.KStripRemain; k++)
+        {
+            sum += ashare[local_x][k] * bshare[local_y][k];
+        }
+    }
+    mIndex += local_x;
+    nIndex += local_y;
+    if (mIndex < p.M && nIndex < p.N)
+    outMat_data[mIndex * p.N + nIndex] = sum;
+    //
+    //    // test
+    //
+    //        if (p.KStripRemain > 0)
+    //        {
+    //            int aoffset2 = aoffset + p.KStrip * BLOCK_SIZE;
+    //            int boffset2 = boffset + p.KStrip * BLOCK_SIZE * p.N;
+    //
+    //            // NOTE: Calculations beyond the index are meaningless
+    //            ashare[local_y][local_x] = image_data[aoffset2 + local_y * p.K + local_x];
+    //            bshare[local_y][local_x] = weight_data[boffset2 + local_y + local_x * p.N];
+    //
+    //            barrier();
+    //
+    //            for (int k = 0; k < p.KStripRemain; k++)
+    //            {
+    //                sum += ashare[local_x][k] * bshare[local_y][k];
+    //            }
+    //        }
+    //
+    //        mIndex += local_x;
+    //        nIndex += local_y;
+    //        if (mIndex < p.M && nIndex < p.N)
+    //            outMat_data[mIndex * p.N + nIndex] = ashare[local_x][local_y];
 }

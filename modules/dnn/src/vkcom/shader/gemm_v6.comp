@@ -47,36 +47,19 @@ void main()
     // if Kstrip is not BLOCK ??
 
     // check if the KStrip is not BLOCK
-    int matrixIndex = local_x/4;
-    int inIndex = local_x - matrixIndex*4;
-
-    amatrix[0][local_y][matrixIndex][inIndex] = image_data[aoffset + local_x + local_y * p.K];
-    bmatrix[0][local_y][matrixIndex][inIndex] = weight_data[boffset + local_y + local_x * p.N];
-
-    for (int i = 1; i < p.KStrip; i++)
+    for (int i = 0; i < p.KStrip; i++)
     {
-        barrier();
-        amatrix[1][local_y][matrixIndex][inIndex] = image_data[aoffset + i * BLOCK_SIZE + local_x + local_y * p.K];
-        bmatrix[1][local_y][matrixIndex][inIndex] = weight_data[boffset + local_y + i * BLOCK_SIZE + local_x * p.N];
-
-        sum += dot(amatrix[0][local_x][0],  bmatrix[0][local_y][0]);
-        sum += dot(amatrix[0][local_x][1],  bmatrix[0][local_y][1]);
-        sum += dot(amatrix[0][local_x][2],  bmatrix[0][local_y][2]);
-        sum += dot(amatrix[0][local_x][3],  bmatrix[0][local_y][3]);
+        ashare[local_y][local_x] = image_data[aoffset + local_y + i * BLOCK_SIZE + local_x*p.K];
+        bshare[local_y][local_x] = weight_data[boffset + local_y *p.N+ i * BLOCK_SIZE * p.N + local_x];
 
         barrier();
 
-        i++;
-        if (i < p.KStrip)
+        for (int k = 0; k < BLOCK_SIZE; k++)
         {
-            amatrix[0][local_y][matrixIndex][inIndex] = image_data[aoffset + i * BLOCK_SIZE + local_x + local_y * p.K];
-            bmatrix[0][local_y][matrixIndex][inIndex] = weight_data[boffset + local_y + i * BLOCK_SIZE + local_x * p.N];
+            sum += ashare[k][local_x] * bshare[k][local_y];
         }
 
-        sum += dot(amatrix[1][local_x][0],  bmatrix[1][local_y][0]);
-        sum += dot(amatrix[1][local_x][1],  bmatrix[1][local_y][1]);
-        sum += dot(amatrix[1][local_x][2],  bmatrix[1][local_y][2]);
-        sum += dot(amatrix[1][local_x][3],  bmatrix[1][local_y][3]);
+        barrier();
     }
 
     if (p.KStripRemain > 0)
@@ -85,20 +68,19 @@ void main()
         int boffset2 = boffset + p.KStrip * BLOCK_SIZE * p.N;
 
         // NOTE: Calculations beyond the index are meaningless
-        ashare[local_y][local_x] = image_data[aoffset2 + local_x + local_y * p.K];
-        bshare[local_y][local_x] = weight_data[boffset2 + local_y + local_x * p.N];
+        ashare[local_y][local_x] = image_data[aoffset2 + local_y + local_x*p.K];
+        bshare[local_y][local_x] = weight_data[boffset2 + local_y *p.N + local_x];
 
         barrier();
 
         for (int k = 0; k < p.KStripRemain; k++)
         {
-            sum += ashare[local_x][k] * bshare[local_y][k];
+            sum += ashare[k][local_x] * bshare[k][local_y];
         }
     }
-
     mIndex += local_x;
     nIndex += local_y;
 
     if (mIndex < p.M && nIndex < p.N)
-    outMat_data[mIndex * p.N + nIndex] = sum;
+        outMat_data[mIndex * p.N + nIndex] = sum;
 }

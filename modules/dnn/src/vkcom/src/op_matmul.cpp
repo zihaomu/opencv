@@ -10,9 +10,10 @@ namespace cv { namespace dnn { namespace vkcom {
 
 #ifdef HAVE_VULKAN
 
-#define BLOCK_SIZE 16
-//#define STRIDE 4
-//#define STEP (BLOCK_SIZE * STRIDE)
+#define BLOCK_SIZE 8
+#define STRIDE 2
+
+#define STEP (BLOCK_SIZE * STRIDE)
 
 #define MAX_COMPUTE_GFLOPS 10
 // TODO: query group count from vulkan device
@@ -54,12 +55,12 @@ bool OpMatMul::forward(std::vector<Tensor>& ins, std::vector<Tensor>& outs)
     H0 = outputShape[kShapeIdxHeight];
     W0 = outputShape[kShapeIdxWidth];
 
-    config.local_size_x = BLOCK_SIZE;
-    config.local_size_y = BLOCK_SIZE;
+    config.local_size_x = STEP;
+    config.local_size_y = STEP;
     config.local_size_z = 1;
 
-    int KStrip = K/BLOCK_SIZE;
-    int KStripRemain = K - KStrip * BLOCK_SIZE;
+    int KStrip = K/STEP;
+    int KStripRemain = K - KStrip * STEP;
     computeGroupCount();
     std::vector<int> param = {M, K, N, KStrip, KStripRemain};
 
@@ -108,8 +109,8 @@ bool OpMatMul::forward(std::vector<Tensor>& ins, std::vector<Tensor>& outs)
 
 bool OpMatMul::computeGroupCount()
 {
-    group_x_ = alignSize(M, BLOCK_SIZE) / BLOCK_SIZE;
-    group_y_ = alignSize(N, BLOCK_SIZE) / BLOCK_SIZE;
+    group_x_ = alignSize(M, STEP) / STEP;
+    group_y_ = alignSize(N, STEP) / STEP;
     group_z_ = 1;
 }
 
