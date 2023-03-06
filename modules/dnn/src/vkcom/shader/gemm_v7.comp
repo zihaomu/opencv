@@ -156,15 +156,6 @@ void main()
 
     nIndex += local_x;
 
-//    if (local_x == 0)
-//    {
-//        outMat_data[(mIndex + 0) * p.N + nIndex] = sum[0];
-//        outMat_data[(mIndex + 1) * p.N + nIndex] = amatrix[0][2][0][0];
-//        outMat_data[(mIndex + 2) * p.N + nIndex] = bmatrix[0][2][0][0];
-//    }
-
-//    outMat_data[nIndex] = sum[0];
-
     if (nIndex < p.N)
     {
         [[unroll]] for (int j = 0; j < BLOCK_SIZE; j++)
