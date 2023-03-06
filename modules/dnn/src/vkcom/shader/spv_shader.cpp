@@ -11,11 +11,12 @@ std::map<std::string, std::pair<const unsigned int *, size_t> > SPVMaps;
 
 void initSPVMaps()
 {
-    SPVMaps.insert(std::make_pair("gemm_v10_spv", std::make_pair(gemm_v10_spv, 1524)));
+    SPVMaps.insert(std::make_pair("gemm_v10_spv", std::make_pair(gemm_v10_spv, 1528)));
     SPVMaps.insert(std::make_pair("max_pool_spv", std::make_pair(max_pool_spv, 1449)));
     SPVMaps.insert(std::make_pair("lrn_spv", std::make_pair(lrn_spv, 1845)));
     SPVMaps.insert(std::make_pair("relu_spv", std::make_pair(relu_spv, 502)));
     SPVMaps.insert(std::make_pair("prior_box_spv", std::make_pair(prior_box_spv, 1480)));
+    SPVMaps.insert(std::make_pair("gemm_v11_spv", std::make_pair(gemm_v11_spv, 2884)));
     SPVMaps.insert(std::make_pair("conv48_nobias_spv", std::make_pair(conv48_nobias_spv, 7182)));
     SPVMaps.insert(std::make_pair("gemm_v6_spv", std::make_pair(gemm_v6_spv, 1532)));
     SPVMaps.insert(std::make_pair("permute_spv", std::make_pair(permute_spv, 765)));

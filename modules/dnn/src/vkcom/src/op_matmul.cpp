@@ -10,8 +10,8 @@ namespace cv { namespace dnn { namespace vkcom {
 
 #ifdef HAVE_VULKAN
 
-#define KSTRIP_LEN 16
-#define BLOCK_SIZE 16
+#define KSTRIP_LEN 32
+#define BLOCK_SIZE 32
 
 #define MAX_COMPUTE_GFLOPS 10
 // TODO: query group count from vulkan device
@@ -65,7 +65,7 @@ bool OpMatMul::forward(std::vector<Tensor>& ins, std::vector<Tensor>& outs)
     std::vector<int> shape = {(int)param.size()};
     Tensor paramTensor = Tensor(reinterpret_cast<const char *>(param.data()), shape, kFormatInt32, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 
-    std::string key = "gemm_v10_spv";
+    std::string key = "gemm_v11_spv";
     destTypes = {
             VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, // input
             VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, // weight

@@ -58,6 +58,7 @@ void main()
         {
             sum += ashare[local_x][k] * bshare[local_y][k];
         }
+        barrier();
     }
 
     if (p.KStripRemain > 0)

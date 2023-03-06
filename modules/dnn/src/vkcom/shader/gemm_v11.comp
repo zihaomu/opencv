@@ -1,0 +1,134 @@
+#version 450
+#define BLOCK_SIZE 32
+
+// Faster than V3, the 4096 x 4096 takes about 420 ms.
+
+layout(binding = 0) readonly buffer Input0{
+    float image_data[];
+};
+
+layout(binding = 1) readonly buffer Input1 {
+    float weight_data[];
+};
+
+layout(binding = 2) writeonly buffer Output{
+    float outMat_data[];
+};
+
+layout(binding = 3) uniform pushBlock {
+    int M;
+    int K;
+    int N;
+    int KStrip;
+    int KStripRemain;
+} p;
+
+shared float ashare[BLOCK_SIZE][BLOCK_SIZE];
+shared float bshare[BLOCK_SIZE][BLOCK_SIZE];
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+void main()
+{
+    int local_x = int(gl_LocalInvocationID.x);
+    int local_y = int(gl_LocalInvocationID.y);
+
+    int global_x = int(gl_WorkGroupID.x);
+    int global_y = int(gl_WorkGroupID.y);
+
+    int mIndex = global_x * BLOCK_SIZE;
+    int nIndex = global_y * BLOCK_SIZE;
+
+    int aoffset = p.K * mIndex;
+    int boffset = nIndex;
+
+    mat2 sum = {{0.f, 0.f}, {0.f, 0.f}};
+    float planA = 0.f;
+    float planB[2] = {0.f, 0.f};
+
+    // TODO! if MxN is not BLOCK,??
+    // if Kstrip is not BLOCK ??
+
+    for (int i = 0; i < p.KStrip; i++)
+    {
+        for (int m = 0; m < 2; m++)
+        {
+            int m16 = m * 16;
+            for (int n = 0; n < 2; n++)
+            {
+                int n16 = n * 16;
+                ashare[m16 + local_y][n16 + local_x] = image_data[aoffset + i * BLOCK_SIZE + local_x + n16 + (local_y + m16) * p.K];
+                bshare[m16 + local_y][n16 + local_x] = weight_data[boffset + local_x + n16 + i * BLOCK_SIZE + (local_y + m16) * p.N];
+            }
+        }
+
+        barrier();
+
+        for (int k = 0; k < BLOCK_SIZE; k++)
+        {
+            for (int i = 0; i < 2; i++)
+            {
+                planB[i] = bshare[k][i*16 + local_y];
+            }
+
+            for (int m = 0; m < 2; m++)
+            {
+                planA = ashare[m*16 + local_x][k];
+                for (int n = 0; n < 2; n++)
+                {
+                    sum[m][n] += planA * planB[n];
+                }
+            }
+        }
+        barrier();
+    }
+
+    if (p.KStripRemain > 0)
+    {
+        int aoffset2 = aoffset + p.KStrip * BLOCK_SIZE;
+        int boffset2 = boffset + p.KStrip * BLOCK_SIZE * p.N;
+
+        for (int m = 0; m < 2; m++)
+        {
+            int m16 = m * 16;
+            for (int n = 0; n < 2; n++)
+            {
+                int n16 = n * 16;
+                ashare[m16 + local_y][n16 + local_x] = image_data[aoffset2 + local_x + n16 + (local_y + m16) * p.K];
+                bshare[m16 + local_y][n16 + local_x] = weight_data[boffset2 + local_x + n16 + (local_y + m16) * p.N];
+            }
+        }
+
+        barrier();
+
+        for (int k = 0; k < p.KStripRemain; k++)
+        {
+            for (int i = 0; i < 2; i++)
+            {
+                planB[i] = bshare[k][i*16 + local_y];
+            }
+
+            for (int m = 0; m < 2; m++)
+            {
+                planA = ashare[m*16 + local_x][k];
+                for (int n = 0; n < 2; n++)
+                {
+                    sum[m][n] += planA * planB[n];
+                }
+            }
+        }
+    }
+
+    mIndex += local_x;
+    nIndex += local_y;
+
+    int mIndex2 = mIndex + 16;
+    int nIndex2 = nIndex + 16;
+    if (mIndex < p.M && nIndex < p.N)
+        outMat_data[mIndex * p.N + nIndex] = sum[0][0];
+    if (mIndex < p.M && nIndex2 < p.N)
+        outMat_data[mIndex * p.N + nIndex2] = sum[0][1];
+    if (mIndex2 < p.M && nIndex < p.N)
+        outMat_data[mIndex2 * p.N + nIndex] = sum[1][0];
+    if (mIndex2 < p.M && nIndex2 < p.N)
+        outMat_data[mIndex2 * p.N + nIndex2] = sum[1][1];
+}
