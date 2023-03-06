@@ -10,10 +10,8 @@ namespace cv { namespace dnn { namespace vkcom {
 
 #ifdef HAVE_VULKAN
 
-#define BLOCK_SIZE 8
-#define STRIDE 2
-
-#define STEP (BLOCK_SIZE * STRIDE)
+#define KSTRIP_LEN 8
+#define BLOCK_SIZE 128
 
 #define MAX_COMPUTE_GFLOPS 10
 // TODO: query group count from vulkan device
@@ -55,19 +53,19 @@ bool OpMatMul::forward(std::vector<Tensor>& ins, std::vector<Tensor>& outs)
     H0 = outputShape[kShapeIdxHeight];
     W0 = outputShape[kShapeIdxWidth];
 
-    config.local_size_x = STEP;
-    config.local_size_y = STEP;
+    config.local_size_x = BLOCK_SIZE;
+    config.local_size_y = BLOCK_SIZE;
     config.local_size_z = 1;
 
-    int KStrip = K/STEP;
-    int KStripRemain = K - KStrip * STEP;
+    int KStrip = K/KSTRIP_LEN;
+    int KStripRemain = K - KStrip * KSTRIP_LEN;
     computeGroupCount();
     std::vector<int> param = {M, K, N, KStrip, KStripRemain};
 
     std::vector<int> shape = {(int)param.size()};
     Tensor paramTensor = Tensor(reinterpret_cast<const char *>(param.data()), shape, kFormatInt32, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 
-    std::string key = "gemm_v6_spv";
+    std::string key = "gemm_v8_spv";
     destTypes = {
             VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, // input
             VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, // weight
@@ -109,8 +107,8 @@ bool OpMatMul::forward(std::vector<Tensor>& ins, std::vector<Tensor>& outs)
 
 bool OpMatMul::computeGroupCount()
 {
-    group_x_ = alignSize(M, STEP) / STEP;
-    group_y_ = alignSize(N, STEP) / STEP;
+    group_x_ = alignSize(M, BLOCK_SIZE) / BLOCK_SIZE;
+    group_y_ = alignSize(N, BLOCK_SIZE) / BLOCK_SIZE;
     group_z_ = 1;
 }
 
