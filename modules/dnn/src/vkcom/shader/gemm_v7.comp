@@ -1,14 +1,18 @@
 #version 450
-#define BLOCK_SIZE 16
 
-// Experiment Row major VS column major.
+#extension GL_EXT_control_flow_attributes : enable
 
+#define BLOCK_SIZE 32
+#define IN_BLOCK 8
+#define IN_BLOCK2 4
 layout(binding = 0) readonly buffer Input0{
     float image_data[];
 };
+
 layout(binding = 1) readonly buffer Input1 {
     float weight_data[];
 };
+
 layout(binding = 2) writeonly buffer Output{
     float outMat_data[];
 };
@@ -21,14 +25,13 @@ layout(binding = 3) uniform pushBlock {
     int KStripRemain;
 } p;
 
-shared float ashare[BLOCK_SIZE][BLOCK_SIZE];
-shared float bshare[BLOCK_SIZE][BLOCK_SIZE];
+shared vec4 amatrix[2][BLOCK_SIZE][IN_BLOCK];
+shared vec4 bmatrix[2][BLOCK_SIZE][IN_BLOCK];
 
-layout(local_size_x = BLOCK_SIZE, local_size_y = BLOCK_SIZE, local_size_z = 1) in;
+layout(local_size_x = BLOCK_SIZE, local_size_y = 1, local_size_z = 1) in;
 void main()
 {
     int local_x = int(gl_LocalInvocationID.x);
-    int local_y = int(gl_LocalInvocationID.y);
 
     int global_x = int(gl_WorkGroupID.x);
     int global_y = int(gl_WorkGroupID.y);
@@ -39,24 +42,73 @@ void main()
     int aoffset = p.K * mIndex;
     int boffset = nIndex;
 
-    float sum = 0.;
+    float sum[BLOCK_SIZE];// = {0.f};
+
+    [[unroll]] for (int i = 0; i < BLOCK_SIZE; i++)
+    {
+        sum[i] = 0.f;
+    }
     // TODO! if MxN is not BLOCK,??
     // if Kstrip is not BLOCK ??
 
     // check if the KStrip is not BLOCK
-    for (int i = 0; i < p.KStrip; i++)
-    {
-        ashare[local_y][local_x] = image_data[aoffset + i * BLOCK_SIZE+local_x+local_y*p.K];
-        bshare[local_y][local_x] = weight_data[boffset + local_y + i*BLOCK_SIZE + local_x*p.N];
+    int matrixIndex = local_x / 4;
+    int inIndex = local_x - matrixIndex*4;
 
+    // Read use WARP
+    [[unroll]] for (int i = 0; i < BLOCK_SIZE; i++)
+    {
+        int i4 = i / 4;
+        int inI4 = i - i4*4;
+
+        amatrix[0][i][matrixIndex][inIndex] = image_data[aoffset + local_x + i * p.K];
+        bmatrix[0][local_x][i4][inI4] = weight_data[boffset + local_x + i * p.N];
+    }
+
+    for (int k = 1; k < p.KStrip; k++)
+    {
         barrier();
 
-        for (int k = 0; k < BLOCK_SIZE; k++)
+        [[unroll]] for (int i = 0; i < BLOCK_SIZE; i++)
         {
-            sum += ashare[local_x][k] * bshare[local_y][k];
+            int i4 = i / 4;
+            int inI4 = i - i4*4;
+
+            amatrix[1][i][matrixIndex][inIndex] = image_data[aoffset + k * BLOCK_SIZE + local_x + i * p.K];
+            bmatrix[1][local_x][i4][inI4] = weight_data[boffset + k * BLOCK_SIZE * p.N + local_x + i * p.N];
+        }
+
+        // compute
+        [[unroll]] for (int i = 0; i < BLOCK_SIZE; i++)
+        {
+            [[unroll]] for (int j = 0; j < IN_BLOCK; j++)
+            {
+                sum[i] += dot(amatrix[0][local_x][j],  bmatrix[0][i][j]);
+            }
         }
 
         barrier();
+
+        k++;
+        if (k < p.KStrip)
+        {
+            [[unroll]] for (int i = 0; i < BLOCK_SIZE; i++)
+            {
+                int i4 = i / 4;
+                int inI4 = i - i4*4;
+
+                amatrix[0][i][matrixIndex][inIndex] = image_data[aoffset + k * BLOCK_SIZE + local_x + i * p.K];
+                bmatrix[0][local_x][i4][inI4] = weight_data[boffset + k * BLOCK_SIZE * p.N + local_x + i * p.N];
+            }
+        }
+
+        [[unroll]] for (int i = 0; i < BLOCK_SIZE; i++)
+        {
+            [[unroll]] for (int j = 0; j < IN_BLOCK; j++)
+            {
+                sum[i] += dot(amatrix[1][local_x][j],  bmatrix[1][i][j]);
+            }
+        }
     }
 
     if (p.KStripRemain > 0)
@@ -64,43 +116,62 @@ void main()
         int aoffset2 = aoffset + p.KStrip * BLOCK_SIZE;
         int boffset2 = boffset + p.KStrip * BLOCK_SIZE * p.N;
 
-        // NOTE: Calculations beyond the index are meaningless
-        ashare[local_y][local_x] = image_data[aoffset2 + local_x + local_y * p.K];
-        bshare[local_y][local_x] = weight_data[boffset2 + local_y + local_x * p.N];
+        // Read use WARP
+        [[unroll]] for (int i = 0; i < BLOCK_SIZE; i++)
+        {
+            int i4 = i / 4;
+            int inI4 = i - i4*4;
+
+            amatrix[0][i][matrixIndex][inIndex] = image_data[aoffset2 + local_x + i * p.K];
+            bmatrix[0][local_x][i4][inI4] = weight_data[boffset2 + local_x + i * p.N];
+        }
 
         barrier();
 
-        for (int k = 0; k < p.KStripRemain; k++)
+        // compute
+        int k = 0;
+        if (p.KStripRemain > BLOCK_SIZE/2)
         {
-            sum += ashare[local_x][k] * bshare[local_y][k];
+            [[unroll]] for (int i = 0; i < BLOCK_SIZE; i++)
+            {
+                [[unroll]] for (int j = 0; j < IN_BLOCK2; j++)
+                {
+                    sum[i] += dot(amatrix[0][local_x][j],  bmatrix[0][i][j]);
+                }
+            }
+
+            k += BLOCK_SIZE/2;
+        }
+
+        [[unroll]] for (int i = 0; i < BLOCK_SIZE; i++)
+        {
+            [[unroll]] for (int kk = k; kk < p.KStripRemain; kk++)
+            {
+                int k4 = kk / 4;
+                int inK4 = kk - k4 * 4;
+                sum[i] += amatrix[0][i][k4][inK4] * bmatrix[0][local_x][k4][inK4];
+            }
         }
     }
-    mIndex += local_x;
-    nIndex += local_y;
-    if (mIndex < p.M && nIndex < p.N)
-    outMat_data[mIndex * p.N + nIndex] = sum;
-    //
-    //    // test
-    //
-    //        if (p.KStripRemain > 0)
-    //        {
-    //            int aoffset2 = aoffset + p.KStrip * BLOCK_SIZE;
-    //            int boffset2 = boffset + p.KStrip * BLOCK_SIZE * p.N;
-    //
-    //            // NOTE: Calculations beyond the index are meaningless
-    //            ashare[local_y][local_x] = image_data[aoffset2 + local_y * p.K + local_x];
-    //            bshare[local_y][local_x] = weight_data[boffset2 + local_y + local_x * p.N];
-    //
-    //            barrier();
-    //
-    //            for (int k = 0; k < p.KStripRemain; k++)
-    //            {
-    //                sum += ashare[local_x][k] * bshare[local_y][k];
-    //            }
-    //        }
-    //
-    //        mIndex += local_x;
-    //        nIndex += local_y;
-    //        if (mIndex < p.M && nIndex < p.N)
-    //            outMat_data[mIndex * p.N + nIndex] = ashare[local_x][local_y];
+
+    nIndex += local_x;
+
+//    if (local_x == 0)
+//    {
+//        outMat_data[(mIndex + 0) * p.N + nIndex] = sum[0];
+//        outMat_data[(mIndex + 1) * p.N + nIndex] = amatrix[0][2][0][0];
+//        outMat_data[(mIndex + 2) * p.N + nIndex] = bmatrix[0][2][0][0];
+//    }
+
+//    outMat_data[nIndex] = sum[0];
+
+    if (nIndex < p.N)
+    {
+        [[unroll]] for (int j = 0; j < BLOCK_SIZE; j++)
+        {
+//            int mIndex1 = mIndex + j;
+            if (mIndex + j < p.M)
+                outMat_data[(mIndex + j) * p.N + nIndex] = sum[j];
+        }
+    }
 }

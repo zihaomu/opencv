@@ -20,7 +20,7 @@ extern const unsigned int conv48_spv[7458];
 extern const unsigned int gemm_spv[753];
 extern const unsigned int conv_spv[1904];
 extern const unsigned int softmax_spv[1496];
-extern const unsigned int gemm_v7_spv[1478];
+extern const unsigned int gemm_v7_spv[3114];
 extern const unsigned int conv_4x4_spv[3000];
 extern const unsigned int gemm_v4_spv[2580];
 extern const unsigned int conv_in_repack_spv[2227];
