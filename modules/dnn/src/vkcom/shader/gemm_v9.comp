@@ -1,7 +1,8 @@
 #version 450
 
+#define KSTRIP_LEN 32
 #define BLOCK_SIZE 64
-#define KSTRIP_LEN 16
+
 #define INNER_THREAD 16 // inner thread
 
 #define MNSTRIP (BLOCK_SIZE/INNER_THREAD)
@@ -30,7 +31,7 @@ layout(binding = 3) uniform pushBlock {
 } p;
 
 shared float ashare[BLOCK_SIZE][KSTRIP_LEN];
-shared float bshare[BLOCK_SIZE][KSTRIP_LEN];
+shared float bshare[KSTRIP_LEN][BLOCK_SIZE];
 
 layout(local_size_x = INNER_THREAD, local_size_y = INNER_THREAD, local_size_z = 1) in;
 void main()
@@ -56,7 +57,8 @@ void main()
         sum[n] = 0.f;
     }
 
-    float panleA[KSTRIP_LEN];
+    float panleA[PER_THREAD];
+    float panleB[PER_THREAD];
     for (int i = 0; i < p.KStrip; i++)
     {
         // load A and B to SMEM.
@@ -76,20 +78,83 @@ void main()
 
         // The follow code takes about 183 ms.
         // The K is 16, the BLOCK is 64
-        for (int m = 0; m < PER_THREAD; m++)
+//        for (int m = 0; m < PER_THREAD; m++)
+//        {
+//            int panleAOff = (local_y + INNER_THREAD * m);
+//            for (int wn = 0; wn < KSTRIP_LEN; wn++)
+//            {
+//                panleA[wn] = ashare[panleAOff][wn];
+//            }
+//
+//            for (int n = 0; n < PER_THREAD; n++)
+//            {
+//                for (int j = 0; j < KSTRIP_LEN; j++)
+//                sum[m*PER_THREAD + n] += panleA[j] * bshare[j][local_x + INNER_THREAD * n];
+//            }
+//        }
+
+        // Version 2, no cache L1, 238
+//        for (int j = 0; j < KSTRIP_LEN; j++)
+//        {
+//            for (int m = 0; m < PER_THREAD; m++)
+//            {
+//                int panleAOff = (local_y + INNER_THREAD * m);
+//                for (int n = 0; n < PER_THREAD; n++)
+//                {
+//                    sum[m*PER_THREAD + n] += ashare[panleAOff][j] * bshare[j][local_x + INNER_THREAD * n];
+//                }
+//            }
+//        }
+
+        // Version 2, with cache L1 A, 239
+//        for (int j = 0; j < KSTRIP_LEN; j++)
+//        {
+//            for (int m = 0; m < PER_THREAD; m++)
+//            {
+//                float AA = ashare[local_y + INNER_THREAD * m][j];
+//                for (int n = 0; n < PER_THREAD; n++)
+//                {
+//                    sum[m*PER_THREAD + n] += AA * bshare[j][local_x + INNER_THREAD * n];
+//                }
+//            }
+//        }
+
+        // Version 2, with cache L1 A and B, 189 ms.
+        for (int j = 0; j < KSTRIP_LEN; j++)
         {
-            int panleAOff = (local_y + INNER_THREAD * m);
-            for (int wn = 0; wn < KSTRIP_LEN; wn++)
+            for (int m = 0; m < PER_THREAD; m++)
             {
-                panleA[wn] = ashare[panleAOff][wn];
+                panleA[m] = ashare[local_y + INNER_THREAD * m][j];
             }
 
-            for (int n = 0; n < PER_THREAD; n++)
+            for (int m = 0; m < PER_THREAD; m++)
             {
-                for (int j = 0; j < KSTRIP_LEN; j++)
-                sum[m*PER_THREAD + n] += panleA[j] * bshare[j][local_x + INNER_THREAD * n];
+                panleB[m] = bshare[j][local_x + INNER_THREAD * m];
+            }
+
+            for (int m = 0; m < PER_THREAD; m++)
+            {
+                for (int n = 0; n < PER_THREAD; n++)
+                {
+                    sum[m*PER_THREAD + n] += panleA[m] * panleB[n];
+                }
             }
         }
+
+//        for (int m = 0; m < PER_THREAD; m++)
+//        {
+//            int panleAOff = (local_y + INNER_THREAD * m);
+//            for (int wn = 0; wn < KSTRIP_LEN; wn++)
+//            {
+//                panleA[wn] = ashare[panleAOff][wn];
+//            }
+//
+//            for (int n = 0; n < PER_THREAD; n++)
+//            {
+//                for (int j = 0; j < KSTRIP_LEN; j++)
+//                sum[m*PER_THREAD + n] += panleA[j] * bshare[j][local_x + INNER_THREAD * n];
+//            }
+//        }
 
         barrier();
     }

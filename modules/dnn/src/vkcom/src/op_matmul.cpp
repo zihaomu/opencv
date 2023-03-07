@@ -10,7 +10,7 @@ namespace cv { namespace dnn { namespace vkcom {
 
 #ifdef HAVE_VULKAN
 
-#define KSTRIP_LEN 16
+#define KSTRIP_LEN 32
 #define BLOCK_SIZE 64
 
 #define MAX_COMPUTE_GFLOPS 10

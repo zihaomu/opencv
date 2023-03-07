@@ -30,7 +30,7 @@ void initSPVMaps()
     SPVMaps.insert(std::make_pair("conv_in_repack_spv", std::make_pair(conv_in_repack_spv, 2227)));
     SPVMaps.insert(std::make_pair("gemm_v8_spv", std::make_pair(gemm_v8_spv, 2177)));
     SPVMaps.insert(std::make_pair("moo_test2_spv", std::make_pair(moo_test2_spv, 494)));
-    SPVMaps.insert(std::make_pair("gemm_v9_spv", std::make_pair(gemm_v9_spv, 1552)));
+    SPVMaps.insert(std::make_pair("gemm_v9_spv", std::make_pair(gemm_v9_spv, 1658)));
     SPVMaps.insert(std::make_pair("moo_test_spv", std::make_pair(moo_test_spv, 1066)));
     SPVMaps.insert(std::make_pair("gemm_v5_spv", std::make_pair(gemm_v5_spv, 349)));
     SPVMaps.insert(std::make_pair("dw_conv_spv", std::make_pair(dw_conv_spv, 1762)));
