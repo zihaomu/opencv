@@ -1,12 +1,13 @@
 #version 450
-#extension GL_EXT_control_flow_attributes : enable
 
-#define BLOCK_SIZE 128
-#define WARP 32
-#define ALL_THREAD 256
+#define BLOCK_SIZE 64
 #define KSTRIP_LEN 16
-#define SM_THREAD 32
-#define PER_THREAD 8
+#define INNER_THREAD 16 // inner thread
+
+#define MNSTRIP (BLOCK_SIZE/INNER_THREAD)
+#define KSTRIP (KSTRIP_LEN/INNER_THREAD)
+
+#define PER_THREAD (BLOCK_SIZE/INNER_THREAD)
 
 // Experiment Row major VS column major.
 
@@ -28,10 +29,10 @@ layout(binding = 3) uniform pushBlock {
     int KStripRemain;
 } p;
 
-shared float ashare[KSTRIP_LEN][BLOCK_SIZE];
-shared float bshare[KSTRIP_LEN][BLOCK_SIZE];
+shared float ashare[BLOCK_SIZE][KSTRIP_LEN];
+shared float bshare[BLOCK_SIZE][KSTRIP_LEN];
 
-layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+layout(local_size_x = INNER_THREAD, local_size_y = INNER_THREAD, local_size_z = 1) in;
 void main()
 {
     int global_x = int(gl_WorkGroupID.x);
@@ -46,95 +47,115 @@ void main()
     int aoffset = p.K * mIndex + local_y * p.K + local_x;
     int boffset = nIndex + local_x + local_y * p.N;
 
-    float sum[PER_THREAD][PER_THREAD]; // output = 2x2, 4x4
-    for (int m = 0; m < PER_THREAD; m++)
+//    float panleB[PER_THREAD];
+
+    float sum[PER_THREAD * PER_THREAD];
+
+    for (int n = 0; n < PER_THREAD * PER_THREAD; n++)
     {
-        for (int n = 0; n < PER_THREAD; n++)
-        {
-            sum[m][n] = 0.f;
-        }
+        sum[n] = 0.f;
     }
 
-    float panleA;
-    float panleB[PER_THREAD];
-
+    float panleA[KSTRIP_LEN];
     for (int i = 0; i < p.KStrip; i++)
     {
         // load A and B to SMEM.
-        [[unroll]] for (int j = 0; j < 8; j++)
-        {
-            int j16 = j * 16;
-            ashare[local_x][j16 + local_y] = image_data[aoffset + j16 * p.K + i * KSTRIP_LEN];
-            bshare[local_y][j16 + local_x] = weight_data[boffset + j16 + i * KSTRIP_LEN * p.N];
-        }
+//         NOT TRANSPOSE
+//        for (int m = 0; m < 2; m++)
+//        {
+//            int mT = m * INNER_THREAD;
+//            for (int n = 0; n < 2; n++)
+//            {
+//                int nT = n * INNER_THREAD;
+//                ashare[mT + local_y][local_x + nT] = image_data[aoffset + mT * p.K + nT + i * KSTRIP_LEN];
+//                bshare[mT + local_y][local_x + nT] = weight_data[boffset + nT + mT * p.N + i * KSTRIP_LEN * p.N];
+//            }
+//        }
 
-        barrier();
+//        barrier();
 
-        [[unroll]] for (int k = 0; k < KSTRIP_LEN; k++)
+        // The follow code takes about 183 ms.
+        // The K is 16, the BLOCK is 64
+        for (int m = 0; m < PER_THREAD; m++)
         {
-            // load smem to reg
-            [[unroll]] for (int wn = 0; wn < PER_THREAD; wn++)
+            int panleAOff = (local_y + INNER_THREAD * m);
+            for (int wn = 0; wn < KSTRIP_LEN; wn++)
             {
-                panleB[wn] = bshare[k][local_x + PER_THREAD * wn];
+                panleA[wn] = ashare[panleAOff][wn];
             }
 
-            [[unroll]] for (int m = 0; m < PER_THREAD; m++)
+            for (int n = 0; n < PER_THREAD; n++)
             {
-                panleA = ashare[k][local_y + PER_THREAD * m];
-                [[unroll]] for (int n = 0; n < PER_THREAD; n++)
-                {
-                    sum[m][n] += panleA * panleB[n];
-                }
+                for (int j = 0; j < KSTRIP_LEN; j++)
+                sum[m*PER_THREAD + n] += panleA[j] * bshare[j][local_x + INNER_THREAD * n];
             }
         }
+
         barrier();
     }
 
-    if (p.KStripRemain > 0)
+//    if (p.KStripRemain > 0)
+//    {
+//        int aoffset2 = aoffset + p.KStrip * KSTRIP_LEN;
+//        int boffset2 = boffset + p.KStrip * KSTRIP_LEN * p.N;
+//
+////        for (int m = 0; m < 2; m++)
+////        {
+////            int mT = m * INNER_THREAD;
+////            for (int n = 0; n < 2; n++)
+////            {
+////                int nT = n * INNER_THREAD;
+////                ashare[mT + local_y][local_x + nT] = image_data[aoffset + mT * p.K + nT + i * KSTRIP_LEN];
+////                bshare[mT + local_y][local_x + nT] = weight_data[boffset + nT + mT * p.N + i * KSTRIP_LEN * p.N];
+////            }
+////        }
+//        // load A and B to SMEM.
+//        for (int m = 0; m < 2; m++)
+//        {
+//            int mT = m * INNER_THREAD;
+//            for (int n = 0; n < 2; n++)
+//            {
+//                int nT = n * INNER_THREAD;
+//                ashare[mT + local_y][local_x + nT] = image_data[aoffset2 + mT * p.K + nT];
+//                bshare[mT + local_y][local_x + nT] = weight_data[boffset2 + nT + mT * p.N];
+//            }
+//        }
+//
+//        barrier();
+//
+////        // change the KStrip to out loop
+////        for (int k = 0; k < p.KStripRemain; k++)
+////        {
+////
+////        }
+//
+////        for (int m = 0; m < PER_THREAD; m++)
+////        {
+////            for (int wn = 0; wn < KSTRIP_LEN; wn++)
+////            {
+////                panleA[wn] = ashare[local_y + INNER_THREAD * m][wn];
+////            }
+////
+////            for (int n = 0; n < PER_THREAD; n++)
+////            {
+////                int sumOffset = m*PER_THREAD + n;
+////                for (int j = 0; j < KSTRIP_LEN; j++)
+////                    sum[sumOffset] += panleA[j] * bshare[j][local_x + INNER_THREAD * n];
+////            }
+////        }
+//    }
+
+    for (int m = 0; m < PER_THREAD; m++)
     {
-        int aoffset2 = aoffset + p.KStrip * KSTRIP_LEN;
-        int boffset2 = boffset + p.KStrip * KSTRIP_LEN * p.N;
-
-        // load A and B to SMEM.
-        [[unroll]] for (int j = 0; j < 8; j++)
-        {
-            int j16 = j * 16;
-            ashare[local_x][j16 + local_y] = image_data[aoffset2 + j16 * p.K];
-            bshare[local_y][j16 + local_x] = weight_data[boffset2 + j16];
-        }
-
-        barrier();
-
-        [[unroll]] for (int k = 0; k < p.KStripRemain; k++)
-        {
-            // load smem to reg
-            [[unroll]] for (int wn = 0; wn < PER_THREAD; wn++)
-            {
-                panleB[wn] = bshare[k][local_x + PER_THREAD * wn];
-            }
-
-            [[unroll]] for (int m = 0; m < PER_THREAD; m++)
-            {
-                panleA = ashare[k][local_y + PER_THREAD * m];
-                [[unroll]] for (int n = 0; n < PER_THREAD; n++)
-                {
-                    sum[m][n] += panleA * panleB[n];
-                }
-            }
-        }
-    }
-
-    [[unroll]] for (int m = 0; m < PER_THREAD; m++)
-    {
-        int mIndex2 = mIndex + m * PER_THREAD + local_y;
+        int mIndex2 = mIndex + m * INNER_THREAD + local_y;
         if (mIndex2 < p.M)
         {
-            [[unroll]] for (int n = 0; n < PER_THREAD; n++)
+            for (int n = 0; n < PER_THREAD; n++)
             {
-                int nIndex2 = nIndex + n * PER_THREAD + local_x;
+                int nIndex2 = nIndex + n * INNER_THREAD + local_x;
                 if (nIndex2 < p.N)
                 {
-                    outMat_data[mIndex2 * p.N + nIndex2] = sum[m][n];
+                    outMat_data[mIndex2 * p.N + nIndex2] = sum[m* PER_THREAD + n];
                 }
             }
         }

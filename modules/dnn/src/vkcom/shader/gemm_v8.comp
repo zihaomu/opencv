@@ -56,13 +56,13 @@ void main()
     for (int i = 0; i < p.KStrip; i++)
     {
         // load A and B to SMEM.
-        [[unroll]] for (int j = 0; j < 4; j++)
-        {
-            ashare[localOut32][WARP * j + localIn32] = image_data[aoffset + j * WARP * p.K + i * KSTRIP_LEN];
-            bshare[localOut32][WARP * j + localIn32] = weight_data[boffset + i * KSTRIP_LEN * p.N + WARP * j];
-        }
-
-        barrier();
+//        [[unroll]] for (int j = 0; j < 4; j++)
+//        {
+//            ashare[localOut32][WARP * j + localIn32] = image_data[aoffset + j * WARP * p.K + i * KSTRIP_LEN];
+//            bshare[localOut32][WARP * j + localIn32] = weight_data[boffset + i * KSTRIP_LEN * p.N + WARP * j];
+//        }
+//
+//        barrier();
 
         [[unroll]] for (int len = 0; len < 8; len++)
         {
@@ -72,7 +72,7 @@ void main()
                 panleA[j + 4] = ashare[len][aid + 64 + j];
             }
 
-            [[unroll]] for (int j = 0;  j < 8; j++)
+            [[unroll]] for (int j = 0;  j < 4; j++)
             {
                 panleB[j] = bshare[len][bid];
                 panleB[j + 4] = bshare[len][bid + 64 + j];
@@ -89,42 +89,42 @@ void main()
         barrier();
     }
 
-    if (p.KStripRemain > 0)
-    {
-        int aoffset2 = aoffset + p.KStrip * KSTRIP_LEN;
-        int boffset2 = boffset + p.KStrip * KSTRIP_LEN * p.N;
-        // load A and B to SMEM.
-        for (int j = 0; j < 4; j++)
-        {
-            ashare[localOut32][WARP * j + localIn32] = image_data[aoffset2 + j * WARP * p.K];
-            bshare[localOut32][WARP * j + localIn32] = weight_data[boffset2 + WARP * j];
-        }
-
-        barrier();
-
-        for (int len = 0; len < p.KStripRemain; len++)
-        {
-            for (int j = 0; j < 4; j++)
-            {
-                panleA[j] = ashare[len][aid + j];
-                panleA[j + 4] = ashare[len][aid + 64 + j];
-            }
-
-            for (int j = 0;  j < 4; j++)
-            {
-                panleB[j] = bshare[len][bid + j];
-                panleB[j + 4] = bshare[len][bid + 64 + j];
-            }
-
-            for (int m = 0; m < 8; m++)
-            {
-                for (int n = 0; n < 8; n++)
-                {
-                    sum[m][n] += panleA[m] * panleB[n];
-                }
-            }
-        }
-    }
+//    if (p.KStripRemain > 0)
+//    {
+//        int aoffset2 = aoffset + p.KStrip * KSTRIP_LEN;
+//        int boffset2 = boffset + p.KStrip * KSTRIP_LEN * p.N;
+//        // load A and B to SMEM.
+//        for (int j = 0; j < 4; j++)
+//        {
+//            ashare[localOut32][WARP * j + localIn32] = image_data[aoffset2 + j * WARP * p.K];
+//            bshare[localOut32][WARP * j + localIn32] = weight_data[boffset2 + WARP * j];
+//        }
+//
+//        barrier();
+//
+//        for (int len = 0; len < p.KStripRemain; len++)
+//        {
+//            for (int j = 0; j < 4; j++)
+//            {
+//                panleA[j] = ashare[len][aid + j];
+//                panleA[j + 4] = ashare[len][aid + 64 + j];
+//            }
+//
+//            for (int j = 0;  j < 4; j++)
+//            {
+//                panleB[j] = bshare[len][bid + j];
+//                panleB[j + 4] = bshare[len][bid + 64 + j];
+//            }
+//
+//            for (int m = 0; m < 8; m++)
+//            {
+//                for (int n = 0; n < 8; n++)
+//                {
+//                    sum[m][n] += panleA[m] * panleB[n];
+//                }
+//            }
+//        }
+//    }
 
     int mIndex0 = mIndex + aid;
     int nIndex0 = nIndex + bid;
@@ -140,14 +140,14 @@ void main()
             int mIndex2 = mIndex1 + 64;
             int nIndex2 = nIndex1 + 64;
 
-//            if (mIndex1 < p.M && nIndex1 < p.N)
-//                outMat_data[mIndex1 * p.N + nIndex1] = sum[m][n];
-//            if (mIndex2 < p.M && nIndex1 < p.N)
-//                outMat_data[mIndex2 * p.N + nIndex1] = sum[m + 4][n];
-//            if (mIndex1 < p.M && nIndex2 < p.N)
-//                outMat_data[mIndex1 * p.N + nIndex2] = sum[m][n + 4];
-//            if (mIndex2 < p.M && nIndex2 < p.N)
-//                outMat_data[mIndex2 * p.N + nIndex2] = sum[m + 4][n + 4];
+            if (mIndex1 < p.M && nIndex1 < p.N)
+                outMat_data[mIndex1 * p.N + nIndex1] = sum[m][n];
+            if (mIndex2 < p.M && nIndex1 < p.N)
+                outMat_data[mIndex2 * p.N + nIndex1] = sum[m + 4][n];
+            if (mIndex1 < p.M && nIndex2 < p.N)
+                outMat_data[mIndex1 * p.N + nIndex2] = sum[m][n + 4];
+            if (mIndex2 < p.M && nIndex2 < p.N)
+                outMat_data[mIndex2 * p.N + nIndex2] = sum[m + 4][n + 4];
         }
     }
 }
