@@ -40,11 +40,8 @@ layout(binding = 3) uniform pushBlock {
     int KStripRemain;
 } p;
 
-
-//shared float shareBuffer[32*1024];
-
-shared float ashare[KSTRIP_LEN][BLOCK_SIZE];
-shared float bshare[BLOCK_SIZE][KSTRIP_LEN];
+shared float ashare[KSTRIP_LEN][BLOCK_SIZE]; // 2 KB
+shared float bshare[BLOCK_SIZE][KSTRIP_LEN]; // 2 KB
 
 layout(local_size_x = ALL_THREAD, local_size_y = 1, local_size_z = 1) in;
 void main()
@@ -68,24 +65,23 @@ void main()
     int boffset = nIndex + b_local_x + b_local_y * p.N;
 
     float sum[PER_THREAD * PER_THREAD];
-
     for (int n = 0; n < PER_THREAD * PER_THREAD; n++)
     {
         sum[n] = 0.f;
     }
 
-    float panleA[4];
-    float panleB[4];
+    float regA[4];
+    float regB[4];
 
     for (int i = 0; i < p.KStrip; i++)
     {
-        // load A to shared A, transpose A
+        // load A to shared memory A, transpose A
         for (int s = 0; s < A_STRIP; s++)
         {
             ashare[a_local_x][s * A_INSTRIP + a_local_y] = image_data[aoffset + s * A_INSTRIP * p.K + i * KSTRIP_LEN];
         }
 
-        // load B to shared B, transpose B
+        // load B to shared memory B, transpose B
         for (int s = 0; s < B_STRIP; s++)
         {
             bshare[b_local_x][s * B_INSTRIP + b_local_y] = weight_data[boffset + s * B_INSTRIP * p.N + i * KSTRIP_LEN * p.N];
@@ -93,24 +89,24 @@ void main()
 
         barrier();
 
-        // Version 2, with cache L1 A and B, 189 ms.
         for (int j = 0; j < KSTRIP_LEN; j++)
         {
+            // Load shared memory to register.
             for (int m = 0; m < 4; m++)
             {
-                panleA[m] = ashare[j][local_x*4 + m];
+                regA[m] = ashare[j][local_x*4 + m];
             }
 
             for (int m = 0; m < 4; m++)
             {
-                panleB[m] = bshare[local_y + 16 * m][j];
+                regB[m] = bshare[local_y + 16 * m][j];
             }
 
             for (int m = 0; m < 4; m++)
             {
                 for (int n = 0; n < 4; n++)
                 {
-                    sum[m*4 + n] += panleA[m] * panleB[n];
+                    sum[m*4 + n] += regA[m] * regB[n];
                 }
             }
         }
@@ -122,13 +118,13 @@ void main()
         int aoffset2 = aoffset + p.KStrip * KSTRIP_LEN;
         int boffset2 = boffset + p.KStrip * KSTRIP_LEN * p.N;
 
-        // load A to shared A, transpose A
+        // load A to shared memory A, transpose A
         for (int s = 0; s < A_STRIP; s++)
         {
             ashare[a_local_x][s * A_INSTRIP + a_local_y] = image_data[aoffset2 + s * A_INSTRIP * p.K];
         }
 
-        // load B to shared B, transpose B
+        // load B to shared memory B, transpose B
         for (int s = 0; s < B_STRIP; s++)
         {
             bshare[b_local_x][s * B_INSTRIP + b_local_y] = weight_data[boffset2 + s * B_INSTRIP * p.N];
@@ -138,35 +134,36 @@ void main()
 
         for (int j = 0; j < p.KStripRemain; j++)
         {
+            // Load shared memory to register.
             for (int m = 0; m < 4; m++)
             {
-                panleA[m] = ashare[j][local_x*4 + m];
+                regA[m] = ashare[j][local_x*4 + m];
             }
 
             for (int m = 0; m < 4; m++)
             {
-                panleB[m] = bshare[local_y + 16 * m][j];
+                regB[m] = bshare[local_y + 16 * m][j];
             }
 
             for (int m = 0; m < 4; m++)
             {
                 for (int n = 0; n < 4; n++)
                 {
-                    sum[m*4 + n] += panleA[m] * panleB[n];
+                    sum[m*4 + n] += regA[m] * regB[n];
                 }
             }
         }
     }
 
-    for (int m = 0; m < PER_THREAD; m++)
+    for (int n = 0; n < PER_THREAD; n++)
     {
-        int mIndex2 = mIndex + local_x * PER_THREAD + m;
-        if (mIndex2 < p.M)
+        int nIndex2 = nIndex + n * INNER_THREAD + local_y;
+        if (nIndex2 < p.N)
         {
-            for (int n = 0; n < PER_THREAD; n++)
+            for (int m = 0; m < PER_THREAD; m++)
             {
-                int nIndex2 = nIndex + n * INNER_THREAD + local_y;
-                if (nIndex2 < p.N)
+                int mIndex2 = mIndex + local_x * PER_THREAD + m;
+                if (mIndex2 < p.M)
                 {
                     outMat_data[mIndex2 * p.N + nIndex2] = sum[m* PER_THREAD + n];
                 }

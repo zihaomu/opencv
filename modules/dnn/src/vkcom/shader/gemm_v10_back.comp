@@ -1,0 +1,339 @@
+#version 450
+
+// GEMM 10 is the fastest one, 192 ms in 4096x4096 dimension.
+
+#define KSTRIP_LEN 32
+#define BLOCK_SIZE 64
+#define WARP 32
+
+#define INNER_THREAD 16 // inner thread
+#define ALL_THREAD 256
+
+#define A_INSTRIP 8
+#define A_STRIP 8 // (BLOCK_SIZE/A_INSTRIP)
+
+#define B_INSTRIP 4 // (ALL_THREAD/BLOCK_SIZE)
+#define B_STRIP 8 // (KSTRIP_LEN/B_INSTRIP)
+
+#define MNSTRIP (BLOCK_SIZE/INNER_THREAD)
+#define KSTRIP (KSTRIP_LEN/INNER_THREAD)
+
+#define PER_THREAD (BLOCK_SIZE/INNER_THREAD)
+
+// Experiment Row major VS column major.
+
+layout(binding = 0) readonly buffer Input0{
+    float image_data[];
+};
+layout(binding = 1) readonly buffer Input1 {
+    float weight_data[];
+};
+layout(binding = 2) writeonly buffer Output{
+    float outMat_data[];
+};
+
+layout(binding = 3) uniform pushBlock {
+    int M;
+    int K;
+    int N;
+    int KStrip;
+    int KStripRemain;
+} p;
+
+//shared float shareBuffer[32*1024];
+
+shared vec4 ashare[KSTRIP_LEN][16];
+shared float bshare[BLOCK_SIZE][KSTRIP_LEN];
+
+layout(local_size_x = ALL_THREAD, local_size_y = 1, local_size_z = 1) in;
+void main()
+{
+    int global_x = int(gl_WorkGroupID.x);
+    int global_y = int(gl_WorkGroupID.y);
+
+    int mIndex = global_x * BLOCK_SIZE;
+    int nIndex = global_y * BLOCK_SIZE;
+
+    int local_x = int(gl_LocalInvocationID.x) % 16; // 0~7
+    int local_y = int(gl_LocalInvocationID.x) / 16; // 0~31
+
+    int a_local_x = int(gl_LocalInvocationID.x) % KSTRIP_LEN; // 256 / 32 = 8
+    int a_local_y = int(gl_LocalInvocationID.x) / KSTRIP_LEN;
+
+    int b_local_x = int(gl_LocalInvocationID.x) % BLOCK_SIZE; // 256 / 64 = 4
+    int b_local_y = int(gl_LocalInvocationID.x) / BLOCK_SIZE;
+
+    int aoffset = p.K * mIndex + a_local_y * p.K + a_local_x;
+    int boffset = nIndex + b_local_x + b_local_y * p.N;
+
+    vec4 sum[PER_THREAD];
+
+//    float sum00 = 0.f, sum01 = 0.f, sum02 = 0.f, sum03 = 0.f;
+//    float sum10 = 0.f, sum11 = 0.f, sum12 = 0.f, sum13 = 0.f;
+//    float sum20 = 0.f, sum21 = 0.f, sum22 = 0.f, sum23 = 0.f;
+//    float sum30 = 0.f, sum31 = 0.f, sum32 = 0.f, sum33 = 0.f;
+
+    for (int m = 0; m < PER_THREAD; m++)
+    {
+        for (int n = 0; n < PER_THREAD; n++)
+        {
+            sum[m][n] = 0.f;
+        }
+    }
+
+
+    vec4 panleA;
+    float panleB[4];
+
+    // TODEL
+    for (int n = 0; n < 4; n++)
+    {
+        panleA[n] = 1.f;
+    }
+//
+//
+//    for (int n = 0; n < 4; n++)
+//    {
+//        panleB[n] = 1.f;
+//    }
+
+    for (int i = 0; i < p.KStrip; i++)
+    {
+        // load A to shared A, transpose A
+        for (int s = 0; s < A_STRIP; s++)
+        {
+            int y = s * A_INSTRIP + a_local_y;
+            int y_4 = y % 4;
+            int yBy4 = y / 4;
+            ashare[a_local_x][yBy4][y_4] = image_data[aoffset + s * A_INSTRIP * p.K + i * KSTRIP_LEN];
+        }
+
+        // load B to shared B, transpose B
+        for (int s = 0; s < B_STRIP; s++)
+        {
+            bshare[b_local_x][s * B_INSTRIP + b_local_y] = weight_data[boffset + s * B_INSTRIP * p.N + i * KSTRIP_LEN * p.N];
+        }
+
+        barrier();
+
+        // Version 2, with cache L1 A and B, 189 ms.
+        for (int j = 0; j < KSTRIP_LEN; j++)
+        {
+
+            panleA = ashare[j][local_x];
+//            panleA[0] = ashare[j][local_x];
+//            panleA[1] = ashare[j][local_x*2 + 1];
+//            panleA[2] = ashare[j][local_x*2 + 2];
+//            panleA[3] = ashare[j][local_x*2 + 3];
+
+            panleB[0] = bshare[local_y][j];
+            panleB[1] = bshare[local_y + 16 * 1][j];
+            panleB[2] = bshare[local_y + 16 * 2][j];
+            panleB[3] = bshare[local_y + 16 * 3][j];
+
+//            for (int m = 0; m < 4; m++)
+//            {
+                for (int n = 0; n < 4; n++)
+                {
+                    sum[n] += panleA * panleB[n];
+                }
+//            }
+
+//            for (int m = 0; m < 4; m++)
+//            {
+//                panleB[m] = bshare[local_y + 16 * m][j];
+//            }
+
+//            sum00 += panleA[0] * panleB[0];
+//            sum01 += panleA[0] * panleB[1];
+//            sum02 += panleA[0] * panleB[2];
+//            sum03 += panleA[0] * panleB[3];
+//
+//            sum10 += panleA[1] * panleB[0];
+//            sum11 += panleA[1] * panleB[1];
+//            sum12 += panleA[1] * panleB[2];
+//            sum13 += panleA[1] * panleB[3];
+//
+//            sum20 += panleA[2] * panleB[0];
+//            sum21 += panleA[2] * panleB[1];
+//            sum22 += panleA[2] * panleB[2];
+//            sum23 += panleA[2] * panleB[3];
+//
+//            sum30 += panleA[3] * panleB[0];
+//            sum31 += panleA[3] * panleB[1];
+//            sum32 += panleA[3] * panleB[2];
+//            sum33 += panleA[3] * panleB[3];
+
+
+        }
+        barrier();
+    }
+
+    if (p.KStripRemain > 0)
+    {
+        int aoffset2 = aoffset + p.KStrip * KSTRIP_LEN;
+        int boffset2 = boffset + p.KStrip * KSTRIP_LEN * p.N;
+
+        // load A to shared A, transpose A
+        for (int s = 0; s < A_STRIP; s++)
+        {
+            int y = s * A_INSTRIP + a_local_y;
+            int y_4 = y % 4;
+            int yBy4 = y / 4;
+            ashare[a_local_x][yBy4][y_4] = image_data[aoffset2 + s * A_INSTRIP * p.K];
+        }
+
+        // load B to shared B, transpose B
+        for (int s = 0; s < B_STRIP; s++)
+        {
+            bshare[b_local_x][s * B_INSTRIP + b_local_y] = weight_data[boffset2 + s * B_INSTRIP * p.N];
+        }
+
+        barrier();
+
+        for (int j = 0; j < p.KStripRemain; j++)
+        {
+            panleA = ashare[j][local_x];
+//            for (int m = 0; m < 4; m++)
+//            {
+//
+//            }
+
+            for (int m = 0; m < 4; m++)
+            {
+                panleB[m] = bshare[local_y + 16 * m][j];
+            }
+
+//            sum00 += panleA[0] * panleB[0];
+//            sum01 += panleA[0] * panleB[1];
+//            sum02 += panleA[0] * panleB[2];
+//            sum03 += panleA[0] * panleB[3];
+//
+//            sum10 += panleA[1] * panleB[0];
+//            sum11 += panleA[1] * panleB[1];
+//            sum12 += panleA[1] * panleB[2];
+//            sum13 += panleA[1] * panleB[3];
+//
+//            sum20 += panleA[2] * panleB[0];
+//            sum21 += panleA[2] * panleB[1];
+//            sum22 += panleA[2] * panleB[2];
+//            sum23 += panleA[2] * panleB[3];
+//
+//            sum30 += panleA[3] * panleB[0];
+//            sum31 += panleA[3] * panleB[1];
+//            sum32 += panleA[3] * panleB[2];
+//            sum33 += panleA[3] * panleB[3];
+
+//            for (int m = 0; m < 4; m++)
+//            {
+                for (int n = 0; n < 4; n++)
+                {
+                    sum[n] += panleA * panleB[n];
+                }
+//            }
+        }
+    }
+
+//    for (int m = 0; m < PER_THREAD; m++)
+//    {
+//        int mIndex2 = mIndex + local_x * PER_THREAD + m;
+//        if (mIndex2 < p.M)
+//        {
+//            for (int n = 0; n < PER_THREAD; n++)
+//            {
+//                int nIndex2 = nIndex + n * INNER_THREAD + local_y;
+//                if (nIndex2 < p.N)
+//                {
+//                    outMat_data[mIndex2 * p.N + nIndex2] = sum[m* PER_THREAD + n];
+//                }
+//            }
+//        }
+//    }
+
+    for (int n = 0; n < PER_THREAD; n++)
+    {
+        int nIndex2 = nIndex + n * INNER_THREAD + local_y;
+        if (nIndex2 < p.N)
+        {
+            for (int m = 0; m < PER_THREAD; m++)
+            {
+                int mIndex2 = mIndex + local_x * PER_THREAD + m;
+                if (mIndex2 < p.M)
+                {
+                    outMat_data[mIndex2 * p.N + nIndex2] = sum[m][n];
+                }
+            }
+        }
+    }
+
+//    int mIndex0 = mIndex + local_x * PER_THREAD;
+//    int nIndex0 = nIndex + local_y;
+//
+//    if (mIndex0 < p.M)
+//    {
+//        if(nIndex0 < p.N)
+//            outMat_data[mIndex0 * p.N + nIndex0] = sum00;
+//
+//        if(nIndex0 + INNER_THREAD < p.N)
+//            outMat_data[mIndex0 * p.N + nIndex0 + INNER_THREAD] = sum01;
+//
+//        if(nIndex0 + INNER_THREAD * 2 < p.N)
+//            outMat_data[mIndex0 * p.N + nIndex0 + INNER_THREAD * 2] = sum02;
+//
+//        if(nIndex0 + INNER_THREAD * 3< p.N)
+//            outMat_data[mIndex0 * p.N + nIndex0 + INNER_THREAD * 3] = sum03;
+//    }
+//
+//    mIndex0 += 1;
+//    if (mIndex0 < p.M)
+//    {
+//        if(nIndex0 < p.N)
+//        outMat_data[mIndex0 * p.N + nIndex0] = sum10;
+//
+//        if(nIndex0 + INNER_THREAD < p.N)
+//        outMat_data[mIndex0 * p.N + nIndex0 + INNER_THREAD] = sum11;
+//
+//        if(nIndex0 + INNER_THREAD * 2 < p.N)
+//        outMat_data[mIndex0 * p.N + nIndex0 + INNER_THREAD * 2] = sum12;
+//
+//        if(nIndex0 + INNER_THREAD * 3< p.N)
+//        outMat_data[mIndex0 * p.N + nIndex0 + INNER_THREAD * 3] = sum13;
+//    }
+//
+//    mIndex0 += 1;
+//    if (mIndex0 < p.M)
+//    {
+//        if(nIndex0 < p.N)
+//        outMat_data[mIndex0 * p.N + nIndex0] = sum20;
+//
+//        if(nIndex0 + INNER_THREAD < p.N)
+//        outMat_data[mIndex0 * p.N + nIndex0 + INNER_THREAD] = sum21;
+//
+//        if(nIndex0 + INNER_THREAD * 2 < p.N)
+//        outMat_data[mIndex0 * p.N + nIndex0 + INNER_THREAD * 2] = sum22;
+//
+//        if(nIndex0 + INNER_THREAD * 3< p.N)
+//        outMat_data[mIndex0 * p.N + nIndex0 + INNER_THREAD * 3] = sum23;
+//    }
+//
+//    mIndex0 += 1;
+//    if (mIndex0 < p.M)
+//    {
+//        if(nIndex0 < p.N)
+//        outMat_data[mIndex0 * p.N + nIndex0] = sum30;
+//
+//        if(nIndex0 + INNER_THREAD < p.N)
+//        outMat_data[mIndex0 * p.N + nIndex0 + INNER_THREAD] = sum31;
+//
+//        if(nIndex0 + INNER_THREAD * 2 < p.N)
+//        outMat_data[mIndex0 * p.N + nIndex0 + INNER_THREAD * 2] = sum32;
+//
+//        if(nIndex0 + INNER_THREAD * 3< p.N)
+//        outMat_data[mIndex0 * p.N + nIndex0 + INNER_THREAD * 3] = sum33;
+//    }
+
+//    int mIndex0 = mIndex + local_x * PER_THREAD + m;
+//    int mIndex0 = mIndex + local_x * PER_THREAD + m;
+//    int mIndex0 = mIndex + local_x * PER_THREAD + m;
+
+}

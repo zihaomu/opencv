@@ -115,9 +115,9 @@ PERF_TEST_P_(Gemm, gemm2D)
     net.setInput(input0, inpNames[0]);
     net.setInput(input1, inpNames[1]);
 
-    net.setPreferableBackend(0);
-    net.setPreferableTarget(0);
-    Mat ref = net.forward();
+//    net.setPreferableBackend(0);
+//    net.setPreferableTarget(0);
+//    Mat ref = net.forward();
 
     net.setPreferableBackend(backendId);
     net.setPreferableTarget(targetId);
