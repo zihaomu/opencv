@@ -8,7 +8,7 @@
 
 namespace cv { namespace dnn { namespace vkcom {
 
-extern const unsigned int gemm_v10_spv[1528];
+extern const unsigned int gemm_v10_spv[2934];
 extern const unsigned int max_pool_spv[1449];
 extern const unsigned int lrn_spv[1845];
 extern const unsigned int relu_spv[502];
@@ -27,7 +27,7 @@ extern const unsigned int gemm_v4_spv[2580];
 extern const unsigned int conv_in_repack_spv[2227];
 extern const unsigned int gemm_v8_spv[2164];
 extern const unsigned int moo_test2_spv[494];
-extern const unsigned int gemm_v9_spv[1938];
+extern const unsigned int gemm_v9_spv[2086];
 extern const unsigned int moo_test_spv[1066];
 extern const unsigned int gemm_v5_spv[349];
 extern const unsigned int dw_conv_spv[1762];
