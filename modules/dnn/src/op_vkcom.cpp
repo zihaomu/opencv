@@ -35,8 +35,6 @@ void Net::Impl::initVkComBackend()
             continue;
         }
 
-        ld.skip = false;
-
         try
         {
             ld.backendNodes[DNN_BACKEND_VKCOM] = layer->initVkCom(ld.inputBlobsWrappers, ld.outputBlobsWrappers);
@@ -97,10 +95,10 @@ void copyToMat(Mat &dst, vkcom::Tensor &src)
 {
     CV_Assert(dst.type() == CV_32F);
 
-    if (dst.empty())
-    {
-//        dst.create()
-    }
+//    if (dst.empty())
+//    {
+////        dst.create()
+//    }
 //    std::cout<<"before copy "<<std::endl;
 //    printblob(dst);
     std::vector<int> shape = src.getShape();

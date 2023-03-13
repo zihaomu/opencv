@@ -188,8 +188,10 @@ public:
                backendId == DNN_BACKEND_CUDA ||
                (backendId == DNN_BACKEND_HALIDE && haveHalide() && axis == 1 && !tranAorB) ||
                (backendId == DNN_BACKEND_WEBNN && axis == 1 && !tranAorB) ||
-               backendId == DNN_BACKEND_CANN ||
-               backendId == DNN_BACKEND_VKCOM && haveVulkan() && !tranAorB;
+               backendId == DNN_BACKEND_CANN
+               ||
+               backendId == DNN_BACKEND_VKCOM && haveVulkan() && !tranAorB
+               ;
     }
 
     virtual bool setActivation(const Ptr<ActivationLayer>& layer) CV_OVERRIDE
@@ -669,6 +671,10 @@ public:
             MatShape inpShape1 = shape(*inputWrap1->getMat());
             MatShape outShape = shape(*outputWrap->getMat());
 
+            // TODO Currently, vulkan only support 2D matmul. Try to support 3D and 4D matmul.
+            if (inpShape0.size() != 2 || inpShape1.size() != 2)
+                return Ptr<BackendNode>();
+
             op = (new vkcom::OpMatMul(vkBlobs, inpShape0[0], inpShape0[1], outShape[1]));
         }
         else
@@ -685,6 +691,10 @@ public:
             MatShape inpShape = shape(*inputWrap->getMat());
             MatShape outShape = shape(*outputWrap->getMat());
             MatShape wShape = shape(weightsMat);
+
+            // TODO Currently, vulkan only support 2D matmul. Try to support 3D and 4D matmul.
+            if (inpShape.size() != 2 || wShape.size() != 2)
+                return Ptr<BackendNode>();
 
             // TODO: Currently, only focus on 2D MatMul.
             CV_Assert(inpShape.size() == 2 && outShape.size() == 2 && wShape.size() == 2);

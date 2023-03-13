@@ -6,7 +6,7 @@
 // Third party copyrights are property of their respective owners.
 
 #include "../../precomp.hpp"
-#include "common.hpp"
+#include "internal.hpp"
 
 namespace cv { namespace dnn { namespace vkcom {
 
@@ -64,7 +64,7 @@ Tensor Tensor::reshape(const char* data, const std::vector<int>& shape, bool all
 {
     if (kDevice == VK_NULL_HANDLE)
     {
-        CV_Error(Error::StsError, "device is NULL");
+        CV_Error(Error::StsError, "device is NULL!");
         return *this;
     }
 
@@ -96,7 +96,7 @@ void Tensor::setTo(float val)
 {
     if (kDevice == VK_NULL_HANDLE)
     {
-        CV_Error(Error::StsError, "device is NULL");
+        CV_Error(Error::StsError, "device is NULL!");
         return;
     }
 

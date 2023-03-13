@@ -1,6 +1,6 @@
-//
-// Created by Z Moo on 2023/2/20.
-//
+// This file is part of OpenCV project.
+// It is subject to the license terms in the LICENSE file found in the top-level directory
+// of this distribution and at http://opencv.org/license.html.
 
 #ifndef OPENCV_PIPELINE_VULKAN_HPP
 #define OPENCV_PIPELINE_VULKAN_HPP
@@ -13,14 +13,12 @@
 
 namespace cv { namespace dnn { namespace vkcom {
 
-// 需要独立创建DescriptorPool之后，再创建DescriptorSet
 class Pipeline;
 class Descriptor
 {
 public:
     static Ptr<Descriptor> create(const VkDescriptorPool& pool, const VkDescriptorSet& set,
                                   Pipeline* _pipeline);
-
     ~Descriptor();
 
     void writeTensor(Tensor tensor, int bindIndex);
@@ -82,6 +80,7 @@ class PipelineFactory
 {
 public:
     static Ptr<PipelineFactory> create();
+
     // Try to retrieve the Pipeline from pipelineCreated, create a new pipeline instance if not found.
     Ptr<Pipeline> getPipeline(const std::string& key, const std::vector<VkDescriptorType>& types,
                                 const std::vector<uint32_t>& localSize = std::vector<uint32_t>());

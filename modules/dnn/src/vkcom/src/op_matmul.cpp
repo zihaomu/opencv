@@ -2,8 +2,7 @@
 // Created by Z Moo on 2023/3/1.
 
 #include "../../precomp.hpp"
-#include "common.hpp"
-//#include "internal.hpp"
+#include "internal.hpp"
 #include "../include/op_matmul.hpp"
 
 namespace cv { namespace dnn { namespace vkcom {
@@ -12,13 +11,6 @@ namespace cv { namespace dnn { namespace vkcom {
 
 #define KSTRIP_LEN 32
 #define BLOCK_SIZE 64
-
-#define MAX_COMPUTE_GFLOPS 10
-// TODO: query group count from vulkan device
-#define MAX_GROUP_COUNT_X 65535
-#define MAX_GROUP_COUNT_Y 65535
-#define MAX_GROUP_COUNT_Z 65535
-#define VEC_LEN 4
 
 OpMatMul::OpMatMul(std::vector<Mat>& matBlobs, const int _M, const int _K, const int _N) : M(_M), K(_K), N(_N)
 {

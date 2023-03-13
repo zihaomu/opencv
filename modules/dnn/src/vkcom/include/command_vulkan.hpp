@@ -54,6 +54,8 @@ public:
 
     void operator=(const CommandPool &) = delete;
     CommandPool(CommandPool &other) = delete;
+
+    void reset();
     ~CommandPool();
     VkCommandPool get() const
     {

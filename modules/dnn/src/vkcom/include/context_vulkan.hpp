@@ -1,6 +1,6 @@
-//
-// Created by Z Moo on 2023/2/20.
-//
+// This file is part of OpenCV project.
+// It is subject to the license terms in the LICENSE file found in the top-level directory
+// of this distribution and at http://opencv.org/license.html.
 
 #ifndef OPENCV_CONTEXT_VULKAN_HPP
 #define OPENCV_CONTEXT_VULKAN_HPP
@@ -131,7 +131,7 @@ public:
     void operator=(const Context &) = delete;
     Context(Context &other) = delete;
     ~Context(); // TODO deconstruct this class when net was deconstructed.
-
+    void reset();
 private:
     GPUInfo parseGPUInfo(VkPhysicalDevice& device);
 
@@ -156,8 +156,6 @@ private:
     std::vector<const char *> enabledExtensions;
     uint32_t instanceExtensionPropertyCount;
     std::vector<VkExtensionProperties> instanceExtensionProperties;
-
-//    VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProperties;
     uint32_t instanceApiVersion;
 };
 

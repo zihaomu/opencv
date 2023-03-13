@@ -3,7 +3,7 @@
 //
 
 #include "../../precomp.hpp"
-#include "common.hpp"
+#include "internal.hpp"
 
 namespace cv { namespace dnn { namespace vkcom {
 #ifdef HAVE_VULKAN

@@ -1,6 +1,6 @@
-//
-// Created by Z Moo on 2023/3/1.
-//
+// This file is part of OpenCV project.
+// It is subject to the license terms in the LICENSE file found in the top-level directory
+// of this distribution and at http://opencv.org/license.html.
 
 #ifndef OPENCV_OP_MATMUL_HPP
 #define OPENCV_OP_MATMUL_HPP
@@ -17,9 +17,6 @@ struct MatMulShaderConfig
     int local_size_x;
     int local_size_y;
     int local_size_z;
-    int block_height;
-    int block_width;
-    int block_depth;
 };
 
 // Current Vulkan Convolution layer only support Conv2D.

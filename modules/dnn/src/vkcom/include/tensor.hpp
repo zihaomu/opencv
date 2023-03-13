@@ -20,7 +20,6 @@ class Buffer;
 class Tensor
 {
 public:
-    // TODO Add the Des type.
     Tensor(Format fmt = kFormatFp32, VkBufferUsageFlags usageFlag = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     Tensor(const char* data, std::vector<int>& shape, Format fmt = kFormatFp32,
            VkBufferUsageFlags usageFlag = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);

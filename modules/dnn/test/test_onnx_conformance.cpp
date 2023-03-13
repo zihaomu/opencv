@@ -1098,12 +1098,13 @@ TEST_P(Test_ONNX_conformance, Layer_Test)
         applyTestTag(CV_TEST_TAG_DNN_SKIP_PARSER, CV_TEST_TAG_DNN_SKIP_ONNX_CONFORMANCE);
     }
 
+    if (global_deny_list.find(name) != global_deny_list.end())
+    {
+        applyTestTag(CV_TEST_TAG_DNN_SKIP_OPENCV_BACKEND, CV_TEST_TAG_DNN_SKIP_ONNX_CONFORMANCE);
+    }
+
     if (backend == DNN_BACKEND_OPENCV)
     {
-        if (global_deny_list.find(name) != global_deny_list.end())
-        {
-            applyTestTag(CV_TEST_TAG_DNN_SKIP_OPENCV_BACKEND, CV_TEST_TAG_DNN_SKIP_ONNX_CONFORMANCE);
-        }
         if ((target == DNN_TARGET_OPENCL_FP16) && (opencl_fp16_deny_list.find(name) != opencl_fp16_deny_list.end()))
         {
             applyTestTag(CV_TEST_TAG_DNN_SKIP_OPENCL_FP16, CV_TEST_TAG_DNN_SKIP_OPENCV_BACKEND, CV_TEST_TAG_DNN_SKIP_ONNX_CONFORMANCE);
@@ -1248,10 +1249,10 @@ TEST_P(Test_ONNX_conformance, Layer_Test)
             {
                 // probably we found random unconnected layers.
                 normAssert(ref_outputs[0], outputs[0], "", default_l1, default_lInf);
-                std::cout<<"ref = "<<std::endl;
-                printblob(ref_outputs[0]);
-                std::cout<<"out = "<<std::endl;
-                printblob(outputs[0]);
+//                std::cout<<"ref = "<<std::endl;
+//                printblob(ref_outputs[0]);
+//                std::cout<<"out = "<<std::endl;
+//                printblob(outputs[0]);
             }
             else
             {

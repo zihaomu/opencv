@@ -16,39 +16,76 @@ static std::string _tf(TString filename, bool required = true)
 {
     return findDataFile(std::string("dnn/onnx/") + filename, required);
 }
-        void printblob(InputArray blob_) {
+        void printblob(InputArray blob_, int strip = 0)
+        {
             Mat blob = blob_.getMat();
             auto shapeV = shape(blob);
             auto typeMat = blob.type();
-//            std::cout<<"blob ptr = "<<blob.data<<std::endl;
             std::cout << "data type = " << typeMat << std::endl;
             float *ptrf;
             uchar *ptru;
             char *ptrc;
             int* ptrs;
-            int len = std::min(int(blob.total()), 1000);
-            if (typeMat == 0) {
-                ptru = (uchar *) blob.data;
-                for (int i = 0; i < len; i++) {
-                    std::cout << (int) *(ptru + i) << ", ";
-                }
-            }else if (typeMat == 1) {
-                ptrc = (char *)blob.data;
-                for(int i = 0; i<len; i++) {
-                    std::cout<<(int) *(ptrc + i)<<", ";}
+            int len = std::min(int(blob.total()), 200);
+            if (strip > 0)
+            {
+                if (typeMat == 0) {
+                    ptru = (uchar *) blob.data;
+                    for (int i = 0; i < len; i++) {
+                        std::cout << (int) *(ptru + i) << ", ";
+                        if ((i+1)%strip == 0)
+                            std::cout <<std::endl;
+                    }
+                }else if (typeMat == 1) {
+                    ptrc = (char *)blob.data;
+                    for(int i = 0; i<len; i++) {
+                        std::cout<<(int) *(ptrc + i)<<", ";
+                        if ((i+1)%strip == 0)
+                            std::cout <<std::endl;}
 
-            }else if (typeMat == 4) {
-                ptrs = (int *)blob.data;
-                for(int i = 0; i<len; i++) {
-                    std::cout<<(int) *(ptrs + i)<<", ";}
+                }else if (typeMat == 4) {
+                    ptrs = (int *)blob.data;
+                    for(int i = 0; i<len; i++) {
+                        std::cout<<(int) *(ptrs + i)<<", ";
+                        if ((i+1)%strip == 0)
+                            std::cout <<std::endl;}
 
-            }
-            else if (typeMat == 5) {
-                ptrf = (float *)blob.data;
-                for(int i = 0; i<len; i++) {
-                    std::cout<<*(ptrf + i)<<", ";
+                }
+                else if (typeMat == 5) {
+                    ptrf = (float *)blob.data;
+                    for(int i = 0; i<len; i++) {
+                        std::cout<<*(ptrf + i)<<", ";
+                        if ((i+1)%strip == 0)
+                            std::cout <<std::endl;
+                    }
                 }
             }
+            else
+            {
+                if (typeMat == 0) {
+                    ptru = (uchar *) blob.data;
+                    for (int i = 0; i < len; i++) {
+                        std::cout << (int) *(ptru + i) << ", ";
+                    }
+                }else if (typeMat == 1) {
+                    ptrc = (char *)blob.data;
+                    for(int i = 0; i<len; i++) {
+                        std::cout<<(int) *(ptrc + i)<<", ";}
+
+                }else if (typeMat == 4) {
+                    ptrs = (int *)blob.data;
+                    for(int i = 0; i<len; i++) {
+                        std::cout<<(int) *(ptrs + i)<<", ";}
+
+                }
+                else if (typeMat == 5) {
+                    ptrf = (float *)blob.data;
+                    for(int i = 0; i<len; i++) {
+                        std::cout<<*(ptrf + i)<<", ";
+                    }
+                }
+            }
+
             std::cout<<std::endl;
         }
 
@@ -89,6 +126,8 @@ public:
         Net net = readNetFromONNX(onnxmodel);
         ASSERT_FALSE(net.empty());
 
+//        net.enableWinograd(false);
+//        net.enableFusion(false);
         net.setPreferableBackend(backend);
         net.setPreferableTarget(target);
 
@@ -112,7 +151,7 @@ public:
 //        std::vector<double> times1;
 //        std::vector<double> times2;
 //        std::vector<double> times3;
-//        for (int i = 0; i < 100; i++)
+//        for (int i = 0; i < 1000; i++)
 //        {
 //            Layer::t0.reset();
 //            Layer::t1.reset();
@@ -127,7 +166,7 @@ public:
 //            times1.push_back(Layer::t1.getTimeMilli());
 //            times2.push_back(Layer::t2.getTimeMilli());
 //            times3.push_back(Layer::t3.getTimeMilli());
-//            if ((i+1)%10 == 0)
+//            if ((i+1)%100 == 0)
 //            {
 //                sort(times.begin(), times.end());
 //                std::cout<<"i = "<<i<<", min times = " <<times[0]<<std::endl;

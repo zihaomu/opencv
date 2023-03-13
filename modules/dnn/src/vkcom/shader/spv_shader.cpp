@@ -11,11 +11,12 @@ std::map<std::string, std::pair<const unsigned int *, size_t> > SPVMaps;
 
 void initSPVMaps()
 {
-    SPVMaps.insert(std::make_pair("gemm_v10_spv", std::make_pair(gemm_v10_spv, 2920)));
+    SPVMaps.insert(std::make_pair("gemm_v10_spv", std::make_pair(gemm_v10_spv, 2974)));
     SPVMaps.insert(std::make_pair("gemm_v10_back_spv", std::make_pair(gemm_v10_back_spv, 2890)));
     SPVMaps.insert(std::make_pair("max_pool_spv", std::make_pair(max_pool_spv, 1449)));
     SPVMaps.insert(std::make_pair("lrn_spv", std::make_pair(lrn_spv, 1845)));
     SPVMaps.insert(std::make_pair("relu_spv", std::make_pair(relu_spv, 502)));
+    SPVMaps.insert(std::make_pair("conv_1x1_fast_spv", std::make_pair(conv_1x1_fast_spv, 3134)));
     SPVMaps.insert(std::make_pair("prior_box_spv", std::make_pair(prior_box_spv, 1480)));
     SPVMaps.insert(std::make_pair("gemm_v11_spv", std::make_pair(gemm_v11_spv, 2884)));
     SPVMaps.insert(std::make_pair("conv48_nobias_spv", std::make_pair(conv48_nobias_spv, 7182)));
@@ -25,20 +26,24 @@ void initSPVMaps()
     SPVMaps.insert(std::make_pair("gemm_spv", std::make_pair(gemm_spv, 753)));
     SPVMaps.insert(std::make_pair("conv_spv", std::make_pair(conv_spv, 1904)));
     SPVMaps.insert(std::make_pair("softmax_spv", std::make_pair(softmax_spv, 1496)));
+    SPVMaps.insert(std::make_pair("conv_depthwise_3x3_spv", std::make_pair(conv_depthwise_3x3_spv, 1977)));
     SPVMaps.insert(std::make_pair("gemm_v7_spv", std::make_pair(gemm_v7_spv, 3114)));
     SPVMaps.insert(std::make_pair("conv_4x4_spv", std::make_pair(conv_4x4_spv, 3000)));
     SPVMaps.insert(std::make_pair("gemm_v4_spv", std::make_pair(gemm_v4_spv, 2580)));
     SPVMaps.insert(std::make_pair("conv_in_repack_spv", std::make_pair(conv_in_repack_spv, 2227)));
+    SPVMaps.insert(std::make_pair("conv_implicit_gemm_spv", std::make_pair(conv_implicit_gemm_spv, 3565)));
     SPVMaps.insert(std::make_pair("gemm_v8_spv", std::make_pair(gemm_v8_spv, 2164)));
     SPVMaps.insert(std::make_pair("moo_test2_spv", std::make_pair(moo_test2_spv, 494)));
     SPVMaps.insert(std::make_pair("gemm_v9_spv", std::make_pair(gemm_v9_spv, 2086)));
     SPVMaps.insert(std::make_pair("moo_test_spv", std::make_pair(moo_test_spv, 1066)));
     SPVMaps.insert(std::make_pair("gemm_v5_spv", std::make_pair(gemm_v5_spv, 349)));
+    SPVMaps.insert(std::make_pair("conv_depthwise_spv", std::make_pair(conv_depthwise_spv, 2092)));
     SPVMaps.insert(std::make_pair("dw_conv_spv", std::make_pair(dw_conv_spv, 1762)));
     SPVMaps.insert(std::make_pair("concat_spv", std::make_pair(concat_spv, 541)));
     SPVMaps.insert(std::make_pair("avg_pool_spv", std::make_pair(avg_pool_spv, 1538)));
     SPVMaps.insert(std::make_pair("gemm_v12_spv", std::make_pair(gemm_v12_spv, 3656)));
     SPVMaps.insert(std::make_pair("gemm_v2_spv", std::make_pair(gemm_v2_spv, 1478)));
+    SPVMaps.insert(std::make_pair("conv_1x1_spv", std::make_pair(conv_1x1_spv, 3324)));
     SPVMaps.insert(std::make_pair("gemm_v3_spv", std::make_pair(gemm_v3_spv, 2197)));
     SPVMaps.insert(std::make_pair("gemm_v13_spv", std::make_pair(gemm_v13_spv, 1773)));
 }

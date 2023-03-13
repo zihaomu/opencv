@@ -3,7 +3,7 @@
 // of this distribution and at http://opencv.org/license.html.
 
 #include "../../precomp.hpp"
-#include "common.hpp"
+#include "internal.hpp"
 #include "../include/context_vulkan.hpp"
 
 namespace cv { namespace dnn { namespace vkcom {
@@ -23,7 +23,6 @@ int support_VK_KHR_get_physical_device_properties2 = 0;
 int support_VK_KHR_get_surface_capabilities2 = 0;
 int support_VK_KHR_portability_enumeration = 0;
 int support_VK_KHR_surface = 0;
-//int support_VK_EXT_debug_utils = 0; // unused.
 int support_VK_EXT_debug_report = 0;
 
 #if defined(__ANDROID_API__) && __ANDROID_API__ >= 26
@@ -92,8 +91,6 @@ static uint32_t findDeviceComputeQueue(const std::vector<VkQueueFamilyProperties
             return i;
         }
     }
-
-    //     NCNN_LOGE("no compute queue");
     return -1;
 }
 
@@ -134,7 +131,6 @@ static uint32_t findDeviceGraphicsQueue(const std::vector<VkQueueFamilyPropertie
         }
     }
 
-    //     NCNN_LOGE("no graphics queue");
     return -1;
 }
 
@@ -178,7 +174,6 @@ static uint32_t findDeviceTransferQueue(const std::vector<VkQueueFamilyPropertie
         return graphics_queue_index;
     }
 
-    //     NCNN_LOGE("no transfer queue");
     return -1;
 }
 
@@ -228,22 +223,12 @@ static int init_instance_extension(VkInstance& kInstance)
         vkGetPhysicalDeviceSurfacePresentModesKHR = (PFN_vkGetPhysicalDeviceSurfacePresentModesKHR)vkGetInstanceProcAddr(kInstance, "vkGetPhysicalDeviceSurfacePresentModesKHR");
     }
 
-//    if (support_VK_EXT_debug_report)
-//    {
-//
-//    }
-
 #if defined(__ANDROID_API__) && __ANDROID_API__ >= 26
     if (support_VK_KHR_android_surface)
     {
         vkCreateAndroidSurfaceKHR = (PFN_vkCreateAndroidSurfaceKHR)vkGetInstanceProcAddr(kInstance, "vkCreateAndroidSurfaceKHR");
     }
 #endif // __ANDROID_API__ >= 26
-
-//    // VK_NV_cooperative_matrix
-//    {
-//        vkGetPhysicalDeviceCooperativeMatrixPropertiesNV = (PFN_vkGetPhysicalDeviceCooperativeMatrixPropertiesNV)vkGetInstanceProcAddr(kInstance, "vkGetPhysicalDeviceCooperativeMatrixPropertiesNV");
-//    }
 
     return 0;
 }
@@ -341,8 +326,6 @@ void Context::createInstance()
             support_VK_KHR_portability_enumeration = exp.specVersion;
         else if (strcmp(exp.extensionName, "VK_KHR_surface") == 0)
             support_VK_KHR_surface = exp.specVersion;
-//        else if (strcmp(exp.extensionName, "VK_EXT_debug_utils") == 0)
-//            support_VK_EXT_debug_utils = exp.specVersion;
         else if (strcmp(exp.extensionName, "VK_EXT_debug_report") == 0)
             support_VK_EXT_debug_report = exp.specVersion;
 #if defined(__ANDROID_API__) && __ANDROID_API__ >= 26
@@ -361,8 +344,6 @@ void Context::createInstance()
         enabledExtensions.push_back("VK_KHR_portability_enumeration");
     if (support_VK_KHR_surface)
         enabledExtensions.push_back("VK_KHR_surface");
-//    if (enableValidationLayers && support_VK_EXT_debug_utils)
-//        enabledExtensions.push_back("VK_EXT_debug_utils");
     if (enableValidationLayers && support_VK_EXT_debug_report)
         enabledExtensions.push_back("VK_EXT_debug_report");
 #if defined(__ANDROID_API__) && __ANDROID_API__ >= 26
@@ -459,9 +440,7 @@ Context::Context()
     vkEnumeratePhysicalDevices(kInstance, &deviceCount, NULL);
     if (deviceCount == 0)
     {
-        // TODO! fallback to CPU
         CV_Error(CV_StsError, "Vulkan Backend: could not find a device with vulkan support!");
-//        CV_LOG_ONCE_WARNING(NULL, "Vulkan Backend: could not find a device with vulkan support!");
     }
 
     std::vector<VkPhysicalDevice> devices(deviceCount);
@@ -511,7 +490,8 @@ Context::Context()
     if (!cmdPoolPtr)
         cmdPoolPtr = CommandPool::create(kQueue, kQueueFamilyIndex);
     else
-        std::cout<<"cmdPoolPtr has been created before!!"<<std::endl;
+        CV_Error(CV_StsError, "cmdPoolPtr has been created before!!");
+
     pipelineFactoryPtr = PipelineFactory::create();
 }
 
@@ -559,7 +539,6 @@ GPUInfo Context::parseGPUInfo(VkPhysicalDevice& kPhysicalDevice)
     CV_LOG_INFO(NULL, "Vendor ID:"<<physicalDeviceProperties.vendorID<<".");
     CV_LOG_INFO(NULL, "Device ID:"<<physicalDeviceProperties.deviceID<<".");
     CV_LOG_INFO(NULL, "Device name:"<<physicalDeviceProperties.deviceName<<".");
-//    CV_LOG_INFO(NULL, "PipelineCacheUUID :"<<physicalDeviceProperties.pipelineCacheUUID<<".");
 
     // info
     info.apiVersion = physicalDeviceProperties.apiVersion;
@@ -726,7 +705,6 @@ GPUInfo Context::parseGPUInfo(VkPhysicalDevice& kPhysicalDevice)
     for (uint32_t j = 0; j < deviceExtensionPropertyCount; j++)
     {
         const VkExtensionProperties& exp = deviceExtensionProperties[j];
-        // NCNN_LOGE("device extension %s = %u", exp.extensionName, exp.specVersion);
 
         if (strcmp(exp.extensionName, "VK_KHR_8bit_storage") == 0)
             info.support_VK_KHR_8bit_storage = exp.specVersion;
@@ -894,9 +872,14 @@ int Context::findBestPhysicalGPUIndex()
     return -1;
 }
 
+void Context::reset()
+{
+    cmdPoolPtr->reset();
+    pipelineFactoryPtr->reset();
+}
+
 Context::~Context()
 {
-    vkDestroyCommandPool(kDevice, cmdPoolPtr->get(), nullptr);
     cmdPoolPtr.release();
     pipelineFactoryPtr.release();
 
@@ -920,6 +903,7 @@ Context::~Context()
 
 static Ptr<Context> contextInstance = nullptr;
 static bool callOnce = false;
+
 Ptr<Context> Context::create()
 {
     cv::AutoLock lock(kContextMtx);
@@ -938,7 +922,6 @@ bool isAvailable()
     {
         Context::create();
     }
-
     return kDevice != VK_NULL_HANDLE;
 }
 

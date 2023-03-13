@@ -3,7 +3,7 @@
 // of this distribution and at http://opencv.org/license.html.
 
 #include "../../precomp.hpp"
-#include "common.hpp"
+#include "internal.hpp"
 #include "../include/command_vulkan.hpp"
 
 namespace cv { namespace dnn { namespace vkcom {
@@ -16,7 +16,7 @@ CommandBuffer::CommandBuffer(CommandPool* pool) : cmdPool(pool)
     CV_Assert(cmdPool);
     if (pool->bufferQueue.empty())
     {
-        VkCommandBufferAllocateInfo cmdBufferCreateInfo{
+        VkCommandBufferAllocateInfo cmdBufferCreateInfo {
                 /* .sType              = */ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
                 /* .pNext              = */ nullptr,
                 /* .commandPool        = */ cmdPool->get(),
@@ -69,8 +69,7 @@ void CommandBuffer::beginRecord(VkCommandBufferUsageFlags flag)
             /* .pInheritanceInfo = */ nullptr,
     };
     vkResetCommandBuffer(cmdBuffer, 0);
-    static int call = 0;
-    call++;
+
     VK_CHECK_RESULT(vkBeginCommandBuffer(cmdBuffer, &cmdBufferBeginInfo));
 }
 
@@ -81,31 +80,26 @@ void CommandBuffer::endRecord()
 
 CommandBuffer::~CommandBuffer()
 {
+    CV_Assert(cmdPool);
     if (needRelease)
     {
-        // TODO release the resource
+        vkFreeCommandBuffers(kDevice, cmdPool->get(), 1, &cmdBuffer);
     }
     else
     {
-        CV_Assert(cmdPool);
         cmdPool->bufferQueue.push(cmdBuffer);
     }
 }
 
 // *********************** CommandPool ********************
-static bool callOnce = false;
-static Ptr<CommandPool> cmdPoolInstance = nullptr;
 Ptr<CommandPool> CommandPool::create(const VkQueue &q, uint32_t _queueFamilyIndex)
 {
     cv::AutoLock lock(kContextMtx);
-    if (!callOnce)
-    {
-        callOnce = true;
-        cmdPoolInstance = Ptr<CommandPool>(new CommandPool(q, _queueFamilyIndex));
-    }
+    Ptr<CommandPool> cmdPoolInstance = Ptr<CommandPool>(new CommandPool(q, _queueFamilyIndex));
 
     return cmdPoolInstance;
 }
+
 CommandPool::CommandPool(const VkQueue& q, uint32_t _queueFamilyIndex) : queue(q), cmdPool(VK_NULL_HANDLE), queueFamilyIndex(_queueFamilyIndex)
 {
     cv::AutoLock lock(kContextMtx);
@@ -118,16 +112,35 @@ CommandPool::CommandPool(const VkQueue& q, uint32_t _queueFamilyIndex) : queue(q
     vkCreateCommandPool(kDevice, &cmdPoolCreateInfo, nullptr, &cmdPool);
 }
 
+void CommandPool::reset()
+{
+    // reset all bufferQueue.
+    while (!bufferQueue.empty())
+    {
+        auto cmdBuffer = bufferQueue.front();
+        bufferQueue.pop();
+
+        vkFreeCommandBuffers(kDevice, cmdPool, 1, &cmdBuffer);
+    }
+}
+
 CommandPool::~CommandPool()
 {
-    static int call = 0;
-    std::cout<<"release call "<< call <<std::endl;
-//    vkDestroyCommandPool(kDevice, cmdPool, nullptr);
+    while (!bufferQueue.empty())
+    {
+        auto cmdBuffer = bufferQueue.front();
+        bufferQueue.pop();
+
+        vkFreeCommandBuffers(kDevice, cmdPool, 1, &cmdBuffer);
+    }
+    vkDestroyCommandPool(kDevice, cmdPool, nullptr);
 }
 
 Ptr<CommandBuffer> CommandPool::allocBuffer()
 {
-    return new CommandBuffer(this);
+    auto cmdBuffer = Ptr<CommandBuffer>(new CommandBuffer(this));
+    cmdBuffer->needRelease = false;
+    return cmdBuffer;
 }
 
 void CommandPool::submitAndWait(VkCommandBuffer& _buffer) const

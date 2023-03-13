@@ -26,19 +26,8 @@ enum Format{
 enum OpType {
     kOpTypeNull = -1,
     kOpTypeConv,
-    kOpTypePool,
-    kOpTypeDWConv,
-    kOpTypeLRN,
-    kOpTypeConcat,
-    kOpTypeSoftmax,
-    kOpTypeReLU,
-    kOpTypePriorBox,
-    kOpTypePermute,
-    kOpTypeConvInternel,
     kOpTypeMatMul,
 };
-
-enum PaddingMode { kPaddingModeSame = -1, kPaddingModeValid, kPaddingModeCaffe, kPaddingModeNum };
 
 enum FusedActivationType {
     kFusedActivUnsupport = -1,
@@ -62,12 +51,5 @@ bool isAvailable();
 #include "op_base.hpp"
 #include "op_conv.hpp"
 #include "op_matmul.hpp"
-//#include "op_concat.hpp"
-//#include "op_lrn.hpp"
-//#include "op_softmax.hpp"
-//#include "op_relu.hpp"
-//#include "op_pool.hpp"
-//#include "op_prior_box.hpp"
-//#include "op_permute.hpp"
 
 #endif // OPENCV_DNN_VKCOM_HPP

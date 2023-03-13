@@ -4,10 +4,10 @@
 
 
 #include "../../precomp.hpp"
-#include "common.hpp"
+#include "internal.hpp"
 #include "../include/pipeline_vulkan.hpp"
 
-#include<climits>
+//#include<climits>
 
 namespace cv { namespace dnn { namespace vkcom {
 
@@ -169,6 +169,7 @@ Ptr<Descriptor> Pipeline::createSet()
         descriptorPairQueue.pop();
 
         Ptr<Descriptor> des = Descriptor::create(iter.first, iter.second, this);
+        des->needRelease = false; // Don't release and try to reuse it.
         return des;
     }
 
@@ -204,6 +205,7 @@ Pipeline::~Pipeline()
         auto iter = descriptorPairQueue.front();
         descriptorPairQueue.pop();
 
+        CV_Assert(iter.first && iter.second);
         vkFreeDescriptorSets(kDevice, iter.first, 1, &iter.second);
         vkDestroyDescriptorPool(kDevice, iter.first, nullptr);
     }
@@ -249,6 +251,12 @@ void PipelineFactory::reset()
     // Step2: create new PipelineCache
     VK_CHECK_RESULT(createPipelineCache(pipelineCache));
 
+    auto iter = pipelineCreated.begin();
+    for (int i = 0; i < pipelineCreated.size(); i++, iter++)
+    {
+        iter->second.release();
+    }
+
     pipelineCreated.clear();
 }
 
@@ -283,16 +291,9 @@ Ptr<Pipeline> PipelineFactory::getPipeline(const std::string& key, const std::ve
     return pipeline;
 }
 
-static Ptr<PipelineFactory> pipelineFactory = nullptr;
-static bool callOnce = false;
 Ptr<PipelineFactory> PipelineFactory::create()
 {
-    cv::AutoLock lock(kContextMtx);
-    if (!callOnce)
-    {
-        callOnce = true;
-        pipelineFactory = Ptr<PipelineFactory>(new PipelineFactory());
-    }
+    Ptr<PipelineFactory> pipelineFactory = Ptr<PipelineFactory>(new PipelineFactory());
     return pipelineFactory;
 }
 

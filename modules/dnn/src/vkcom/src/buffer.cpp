@@ -6,7 +6,7 @@
 // Third party copyrights are property of their respective owners.
 
 #include "../../precomp.hpp"
-#include "common.hpp"
+#include "internal.hpp"
 #include "../include/buffer.hpp"
 
 namespace cv { namespace dnn { namespace vkcom {
@@ -32,7 +32,7 @@ bool Buffer::init(size_t size_in_bytes, const char* data)
 {
     if (buffer_ != VK_NULL_HANDLE)
     {
-        printf("Warn: Buffer object already inited\n");
+        CV_LOG_WARNING(NULL, "Warn: Buffer object already inited!");
         return false;
     }
 
@@ -49,9 +49,12 @@ bool Buffer::init(size_t size_in_bytes, const char* data)
     VkMemoryAllocateInfo allocateInfo = {};
     allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocateInfo.allocationSize = memoryRequirements.size;
+
+    // TODO: Try to optimize the memory at discrete graphics card. For AMD and GPU discrete graphics card,
+    //  we should use VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT.
+
     allocateInfo.memoryTypeIndex = findMemoryType(memoryRequirements.memoryTypeBits,
                                                   VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
-//                                                  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
                                                   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
                                                   );
     VK_CHECK_RESULT(vkAllocateMemory(kDevice, &allocateInfo, NULL, &memory_));

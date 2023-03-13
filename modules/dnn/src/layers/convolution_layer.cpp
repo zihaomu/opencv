@@ -683,57 +683,34 @@ public:
 
         if (activationType == -1)
         {
-            std::cout<<"Unsupported fused Active type in Conv layer!!!"<<std::endl;
+            CV_LOG_WARNING(NULL, "Unsupported fused Active type in Conv layer!!!");
             return Ptr<BackendNode>();
         }
 
-        if (activationType != 0)
-        {
-            std::cout<<"Unsupported fused Active type in Conv layer!!!"<<std::endl;
-            return Ptr<BackendNode>();
-        }
+//        if (activationType != 0)
+//        {
+//            std::cout<<"Unsupported fused Active type in Conv layer!!!"<<std::endl;
+//            return Ptr<BackendNode>();
+//        }
 
-        // TODO: support group > 1， group 信息需要这样确定吗？
         const int inpGroupCn = blobs[0].size[1];
         int ngroups = inpShape[1] / inpGroupCn;
         CV_Assert(outShape[1] % ngroups == 0);
         if (ngroups != 1)
             return Ptr<BackendNode>();
 
-        std::vector<Mat> vkBlobs;
+        Mat weightVK;
         if (fusedWeights)
         {
-            Mat wm;
-            weightsMat.copyTo(wm); // to handle the case of isContinuous() == false
-            wm = wm.reshape(1, blobs[0].dims, blobs[0].size);
-            vkBlobs.push_back(wm);
+            weightsMat.copyTo(weightVK); // to handle the case of isContinuous() == false
+            weightVK = weightVK.reshape(1, blobs[0].dims, blobs[0].size);
         }
         else
-            vkBlobs.push_back(blobs[0]);
+            weightVK = blobs[0];
 
-        if (has_bias)
-        {
-            // TODO replace the 4 with VEC_LEN.
-            int biasAlignedSize = alignSize(outShape[1], 4);
-            std::vector<int> sizeBias = {1, biasAlignedSize};
-            Mat biasesMat(sizeBias, CV_32F, Scalar_<float>(0.0f));
-
-            float* biasPtr = biasesMat.ptr<float>();
-            for (int i = 0; i < biasvec.size(); i++)
-            {
-                *(biasPtr + i) = biasvec[i];
-            }
-
-            vkBlobs.push_back(biasesMat);
-        }
-
-        // TODO not implement the depthwise
-        if (ngroups > 1 && ngroups == outShape[1] && ngroups == inpShape[1])
-            return Ptr<BackendNode>();
-
-
+        CV_Assert(weightVK.isContinuous());
         CV_Assert(pads_begin.size() == 2);
-        Ptr<vkcom::OpBase> op(new vkcom::OpConv(vkBlobs, activationType, ngroups, outShape[1], inpShape[1],
+        Ptr<vkcom::OpBase> op(new vkcom::OpConv(weightVK, biasvec, activationType, ngroups, outShape[1], inpShape[1],
                                                             kernel.height, kernel.width, stride.height, stride.width,
                                                             dilation.height, dilation.width, pads_begin[1], pads_begin[0],
                                                             fusedAdd));

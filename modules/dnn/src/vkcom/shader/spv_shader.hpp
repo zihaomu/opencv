@@ -8,11 +8,12 @@
 
 namespace cv { namespace dnn { namespace vkcom {
 
-extern const unsigned int gemm_v10_spv[2920];
+extern const unsigned int gemm_v10_spv[2974];
 extern const unsigned int gemm_v10_back_spv[2890];
 extern const unsigned int max_pool_spv[1449];
 extern const unsigned int lrn_spv[1845];
 extern const unsigned int relu_spv[502];
+extern const unsigned int conv_1x1_fast_spv[3134];
 extern const unsigned int prior_box_spv[1480];
 extern const unsigned int gemm_v11_spv[2884];
 extern const unsigned int conv48_nobias_spv[7182];
@@ -22,20 +23,24 @@ extern const unsigned int conv48_spv[7458];
 extern const unsigned int gemm_spv[753];
 extern const unsigned int conv_spv[1904];
 extern const unsigned int softmax_spv[1496];
+extern const unsigned int conv_depthwise_3x3_spv[1977];
 extern const unsigned int gemm_v7_spv[3114];
 extern const unsigned int conv_4x4_spv[3000];
 extern const unsigned int gemm_v4_spv[2580];
 extern const unsigned int conv_in_repack_spv[2227];
+extern const unsigned int conv_implicit_gemm_spv[3565];
 extern const unsigned int gemm_v8_spv[2164];
 extern const unsigned int moo_test2_spv[494];
 extern const unsigned int gemm_v9_spv[2086];
 extern const unsigned int moo_test_spv[1066];
 extern const unsigned int gemm_v5_spv[349];
+extern const unsigned int conv_depthwise_spv[2092];
 extern const unsigned int dw_conv_spv[1762];
 extern const unsigned int concat_spv[541];
 extern const unsigned int avg_pool_spv[1538];
 extern const unsigned int gemm_v12_spv[3656];
 extern const unsigned int gemm_v2_spv[1478];
+extern const unsigned int conv_1x1_spv[3324];
 extern const unsigned int gemm_v3_spv[2197];
 extern const unsigned int gemm_v13_spv[1773];
 

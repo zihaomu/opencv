@@ -32,7 +32,7 @@ void printblob(InputArray blob_, int strip)
     uchar *ptru;
     char *ptrc;
     int* ptrs;
-    int len = std::min(int(blob.total()), 1000);
+    int len = std::min(int(blob.total()), 800);
     if (strip > 0)
     {
         if (typeMat == 0) {
