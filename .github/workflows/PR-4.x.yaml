@@ -26,7 +26,7 @@ jobs:
     uses: opencv/ci-gha-workflow/.github/workflows/OCV-PR-4.x-macOS-ARM64.yaml@main
 
   macOS-ARM64-Vulkan:
-    uses: zihaomu/ci-gha-workflow/.github/workflows/OCV-PR-4.x-macOS-ARM64-Vulkan.yaml@main
+    uses: zihaomu/ci-gha-workflow/optimize_vulkan_dnn/.github/workflows/OCV-PR-4.x-macOS-ARM64-Vulkan.yaml@main
 
   macOS-x64:
     uses: opencv/ci-gha-workflow/.github/workflows/OCV-PR-4.x-macOS-x86_64.yaml@main
