@@ -81,7 +81,6 @@ Pipeline::Pipeline(const uint32_t* spv, size_t length,
                    const std::vector<VkDescriptorType>& _bufferTypes, VkPipelineCache& cache,
                    const std::vector<uint32_t>& localSize) : bufferTypes(_bufferTypes)
 {
-    
     // Step1: create Module from spv file.
     // TODO, add the local_size_x, local_size_y, and z at here.
     VkShaderModule shaderModule;

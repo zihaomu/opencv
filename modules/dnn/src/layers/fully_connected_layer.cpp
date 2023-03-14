@@ -189,7 +189,7 @@ public:
                (backendId == DNN_BACKEND_HALIDE && haveHalide() && axis == 1 && !tranAorB) ||
                (backendId == DNN_BACKEND_WEBNN && axis == 1 && !tranAorB) ||
                backendId == DNN_BACKEND_CANN ||
-               backendId == DNN_BACKEND_VKCOM && haveVulkan() && !tranAorB;
+               (backendId == DNN_BACKEND_VKCOM && haveVulkan() && !tranAorB);
     }
 
     virtual bool setActivation(const Ptr<ActivationLayer>& layer) CV_OVERRIDE
