@@ -5,7 +5,6 @@ import sys
 import os
 import argparse
 import time
-
 try:
     import caffe
 except ImportError:
