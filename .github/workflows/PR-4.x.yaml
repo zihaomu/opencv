@@ -76,10 +76,11 @@ jobs:
           else
             echo "No merge since ${{ env.PR_AUTHOR }}/opencv_extra does not have branch ${{ env.SOURCE_BRANCH_NAME }}"
           fi
-        working-directory: ${{ github.workspace }}/opencv_extra
-      - name: Extra DNN models update
-        timeout-minutes: 60
+#        working-directory: ${{ github.workspace }}/opencv_extra
+#      - name: Extra DNN models update
+#        timeout-minutes: 60
 #        run: |
+#          echo "DNN models are up to date"
 #          DOWNLOAD_MODELS_FILE='download_models.py'
 #          LATEST_SAVED_HASH=$(cat $DNN_MODELS/dnn/latest-hash-${{ env.TARGET_BRANCH_NAME }}.txt)
 #          LATEST_HASH=$(sha256sum opencv_extra/testdata/dnn/$DOWNLOAD_MODELS_FILE | awk '{print $1}')
