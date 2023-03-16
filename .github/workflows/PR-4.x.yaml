@@ -47,6 +47,7 @@ jobs:
           echo "PR Author fork: ${{ env.PR_AUTHOR_FORK }}"
           echo "Source branch name: ${{ env.SOURCE_BRANCH_NAME }}"
           echo "Target branch name: ${{ env.TARGET_BRANCH_NAME }}"
+          echo "OPENCV_VULKAN_RUNTIME = $OPENCV_VULKAN_RUNTIME"
       - name: Clean
         timeout-minutes: 60
         run: find . -mindepth 1 -delete
