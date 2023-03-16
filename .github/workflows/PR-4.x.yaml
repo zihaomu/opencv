@@ -19,6 +19,7 @@ env:
   PYTHONPATH: '${{ github.workspace }}/build/python_loader:$PYTHONPATH'
   OPENCV_TEST_DATA_PATH: '${{ github.workspace }}/opencv_extra/testdata'
   GTEST_FILTER_STRING: '-GOTURN.accuracy:DaSiamRPN.accuracy:NanoTrack.accuracy_NanoTrack_V2'
+  OPENCV_VULKAN_RUNTIME: '$VULKAN_SDK/MoltenVK/dylib/macOS/libMoltenVK.dylib'
 
 jobs:
   BuildAndTest:
@@ -46,6 +47,7 @@ jobs:
           echo "PR Author fork: ${{ env.PR_AUTHOR_FORK }}"
           echo "Source branch name: ${{ env.SOURCE_BRANCH_NAME }}"
           echo "Target branch name: ${{ env.TARGET_BRANCH_NAME }}"
+          echo "OPENCV_VULKAN_RUNTIME = $OPENCV_VULKAN_RUNTIME"
       - name: Clean
         timeout-minutes: 60
         run: find . -mindepth 1 -delete
