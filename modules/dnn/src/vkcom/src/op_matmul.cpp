@@ -109,6 +109,7 @@ bool OpMatMul::computeGroupCount()
     group_x_ = alignSize(M, BLOCK_SIZE) / BLOCK_SIZE;
     group_y_ = alignSize(N, BLOCK_SIZE) / BLOCK_SIZE;
     group_z_ = 1;
+    return true;
 }
 
 #endif // HAVE_VULKAN
