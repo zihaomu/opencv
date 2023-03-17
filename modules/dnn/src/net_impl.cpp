@@ -33,6 +33,10 @@ std::string detail::NetImplBase::getDumpFileNameBase() const
 Net::Impl::~Impl()
 {
     // nothing
+#ifdef HAVE_VULKAN
+    if (context)
+        context->reset();
+#endif
 }
 
 
@@ -844,6 +848,14 @@ void Net::Impl::forwardLayer(LayerData& ld)
         tm.stop();
         int64 t = tm.getTimeTicks();
         layersTimings[ld.id] = (t > 0) ? t : t + 1;  // zero for skipped layers only
+//        std::cout<<"ld name = "<<ld.name<<", take time = "<<tm.getTimeMilli()<<std::endl;
+//
+//        std::cout<<"input = "<<std::endl;
+//        printShape(ld.outputBlobs[0]);
+//        printblob(*ld.inputBlobs[0]);
+//        std::cout<<"output = "<<std::endl;
+//        printShape(ld.outputBlobs[0]);
+//        printblob(ld.outputBlobs[0], 100);
     }
     else
     {
