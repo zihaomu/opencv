@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  EXTRA_CMAKE_OPTIONS: '-DCL_Z_OPTION=/Z7 -DWITH_VULKAN=ON -DOPENCV_DOWNLOAD_PATH=%BINARIES_CACHE% -DBUILD_EXAMPLES=ON -DOPENCV_ENABLE_NONFREE=ON -DCMAKE_BUILD_TYPE=Release'
+  EXTRA_CMAKE_OPTIONS: '-DCL_Z_OPTION=/Z7 -DWITH_ADE=OFF -DWITH_VULKAN=ON -DOPENCV_DOWNLOAD_PATH=%BINARIES_CACHE% -DBUILD_EXAMPLES=ON -DOPENCV_ENABLE_NONFREE=ON -DCMAKE_BUILD_TYPE=Release'
   OPENCV_TEST_DATA_PATH: ${{ github.workspace }}\opencv_extra\testdata
   PR_AUTHOR: ${{ github.event.pull_request.user.login }}
   PR_AUTHOR_FORK: ${{ github.event.pull_request.head.repo.full_name }}
