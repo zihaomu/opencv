@@ -26,7 +26,7 @@ void* Tensor::map()
 {
     void *p;
 
-    VK_CHECK_RESULT(vkMapMemory(kDevice, buffer_->getVkMemory(),
+    VK_CHECK_RESULT(vkMapMemory(*kDevicePtr, buffer_->getVkMemory(),
                                 0, size_in_byte_, 0, (void **)&p));
 
     return p;
@@ -34,7 +34,7 @@ void* Tensor::map()
 
 void Tensor::unMap()
 {
-    vkUnmapMemory(kDevice, buffer_->getVkMemory());
+    vkUnmapMemory(*kDevicePtr, buffer_->getVkMemory());
 }
 
 Shape Tensor::getShape() const
@@ -62,7 +62,7 @@ int Tensor::dimNum() const
 
 Tensor Tensor::reshape(const char* data, const std::vector<int>& shape, bool alloc, Format fmt)
 {
-    if (kDevice == VK_NULL_HANDLE)
+    if (*kDevicePtr == VK_NULL_HANDLE)
     {
         CV_Error(Error::StsError, "device is NULL!");
         return *this;
@@ -94,7 +94,7 @@ Tensor Tensor::reshape(const char* data, const std::vector<int>& shape, bool all
 
 void Tensor::setTo(float val)
 {
-    if (kDevice == VK_NULL_HANDLE)
+    if (*kDevicePtr == VK_NULL_HANDLE)
     {
         CV_Error(Error::StsError, "device is NULL!");
         return;

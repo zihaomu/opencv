@@ -37,7 +37,7 @@ CommandBuffer::CommandBuffer(CommandPool* pool) : cmdPool(pool)
                 /* .level              = */ VK_COMMAND_BUFFER_LEVEL_PRIMARY,
                 /* .commandBufferCount = */ 1,
         };
-        vkAllocateCommandBuffers(kDevice, &cmdBufferCreateInfo, &cmdBuffer);
+        vkAllocateCommandBuffers(*kDevicePtr, &cmdBufferCreateInfo, &cmdBuffer);
     }
     else
     {
@@ -97,7 +97,7 @@ CommandBuffer::~CommandBuffer()
     CV_Assert(cmdPool);
     if (needRelease)
     {
-        vkFreeCommandBuffers(kDevice, cmdPool->get(), 1, &cmdBuffer);
+        vkFreeCommandBuffers(*kDevicePtr, cmdPool->get(), 1, &cmdBuffer);
     }
     else
     {
@@ -123,7 +123,7 @@ CommandPool::CommandPool(const VkQueue& q, uint32_t _queueFamilyIndex) : queue(q
         /* .flags            = */ VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
         /* .queueFamilyIndex = */ queueFamilyIndex,
     };
-    vkCreateCommandPool(kDevice, &cmdPoolCreateInfo, nullptr, &cmdPool);
+    vkCreateCommandPool(*kDevicePtr, &cmdPoolCreateInfo, nullptr, &cmdPool);
 }
 
 void CommandPool::reset()
@@ -134,7 +134,7 @@ void CommandPool::reset()
         auto cmdBuffer = bufferQueue.front();
         bufferQueue.pop();
 
-        vkFreeCommandBuffers(kDevice, cmdPool, 1, &cmdBuffer);
+        vkFreeCommandBuffers(*kDevicePtr, cmdPool, 1, &cmdBuffer);
     }
 }
 
@@ -145,9 +145,9 @@ CommandPool::~CommandPool()
         auto cmdBuffer = bufferQueue.front();
         bufferQueue.pop();
 
-        vkFreeCommandBuffers(kDevice, cmdPool, 1, &cmdBuffer);
+        vkFreeCommandBuffers(*kDevicePtr, cmdPool, 1, &cmdBuffer);
     }
-    vkDestroyCommandPool(kDevice, cmdPool, nullptr);
+    vkDestroyCommandPool(*kDevicePtr, cmdPool, nullptr);
 }
 
 Ptr<CommandBuffer> CommandPool::allocBuffer()

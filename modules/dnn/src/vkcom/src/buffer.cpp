@@ -41,10 +41,10 @@ bool Buffer::init(size_t size_in_bytes, const char* data)
     bufferCreateInfo.size = (VkDeviceSize)size_in_bytes;
     bufferCreateInfo.usage = usageFlag_;
     bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    VK_CHECK_RESULT(vkCreateBuffer(kDevice, &bufferCreateInfo, NULL, &buffer_));
+    VK_CHECK_RESULT(vkCreateBuffer(*kDevicePtr, &bufferCreateInfo, NULL, &buffer_));
 
     VkMemoryRequirements memoryRequirements;
-    vkGetBufferMemoryRequirements(kDevice, buffer_, &memoryRequirements);
+    vkGetBufferMemoryRequirements(*kDevicePtr, buffer_, &memoryRequirements);
 
     VkMemoryAllocateInfo allocateInfo = {};
     allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -57,17 +57,17 @@ bool Buffer::init(size_t size_in_bytes, const char* data)
                                                   VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
                                                   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
                                                   );
-    VK_CHECK_RESULT(vkAllocateMemory(kDevice, &allocateInfo, NULL, &memory_));
+    VK_CHECK_RESULT(vkAllocateMemory(*kDevicePtr, &allocateInfo, NULL, &memory_));
 
     if (data)
     {
         char* dst;
-        VK_CHECK_RESULT(vkMapMemory(kDevice, memory_, 0, size_in_bytes, 0, (void **)&dst));
+        VK_CHECK_RESULT(vkMapMemory(*kDevicePtr, memory_, 0, size_in_bytes, 0, (void **)&dst));
         memcpy(dst, data, size_in_bytes);
-        vkUnmapMemory(kDevice, memory_);
+        vkUnmapMemory(*kDevicePtr, memory_);
     }
 
-    VK_CHECK_RESULT(vkBindBufferMemory(kDevice, buffer_, memory_, 0));
+    VK_CHECK_RESULT(vkBindBufferMemory(*kDevicePtr, buffer_, memory_, 0));
     return true;
 }
 
@@ -80,8 +80,8 @@ Buffer::Buffer(size_t size_in_bytes, const char* data, VkBufferUsageFlags usageF
 
 Buffer::~Buffer()
 {
-    vkFreeMemory(kDevice, memory_, NULL);
-    vkDestroyBuffer(kDevice, buffer_, NULL);
+    vkFreeMemory(*kDevicePtr, memory_, NULL);
+    vkDestroyBuffer(*kDevicePtr, buffer_, NULL);
 }
 
 #endif // HAVE_VULKAN

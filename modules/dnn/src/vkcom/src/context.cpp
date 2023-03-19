@@ -25,19 +25,17 @@ Below is the original copyright:
 #include "../../precomp.hpp"
 #include "internal.hpp"
 #include "../include/context.hpp"
-#include "../vulkan/vk_loader.hpp"
 
 namespace cv { namespace dnn { namespace vkcom {
 
 #ifdef HAVE_VULKAN
 
 // Global Variable
-VkQueue kQueue = VK_NULL_HANDLE;
-VkDevice kDevice = VK_NULL_HANDLE; // It was used almost everywhere.
+Ptr<VkDevice> kDevicePtr = nullptr;
 VkPhysicalDeviceMemoryProperties physicalDeviceMemoryProperties;
 cv::Mutex kContextMtx;
-Ptr<CommandPool> cmdPoolPtr;
-Ptr<PipelineFactory> pipelineFactoryPtr;
+Ptr<CommandPool> cmdPoolPtr = nullptr;
+Ptr<PipelineFactory> pipelineFactoryPtr = nullptr;
 
 int support_VK_KHR_external_memory_capabilities = 0;
 int support_VK_KHR_get_physical_device_properties2 = 0;
@@ -210,6 +208,9 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debugReportCallbackFn(
     std::cout << "Debug Report: " << pLayerPrefix << ":" << pMessage << std::endl;
     return VK_FALSE;
 }
+
+VkQueue Context::kQueue = VK_NULL_HANDLE;
+VkDevice Context::kDevice = VK_NULL_HANDLE;
 
 void Context::createInstance()
 {
@@ -434,6 +435,7 @@ Context::Context()
     deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
 
     VK_CHECK_RESULT(vkCreateDevice(kPhysicalDevice, &deviceCreateInfo, NULL, &kDevice));
+    kDevicePtr = makePtr<VkDevice>(kDevice);
 
     // Get a handle to the only member of the queue family.
     vkGetDeviceQueue(kDevice, kQueueFamilyIndex, 0, &kQueue);
@@ -829,10 +831,15 @@ void Context::reset()
 
 Context::~Context()
 {
-    cmdPoolPtr.release();
-    pipelineFactoryPtr.release();
+    if (cmdPoolPtr)
+        cmdPoolPtr.release();
+    if (pipelineFactoryPtr)
+        pipelineFactoryPtr.release();
 
     vkDestroyDevice(kDevice, NULL);
+    if (kDevicePtr)
+        kDevicePtr.release();
+
     if (enableValidationLayers)
     {
         auto func = (PFN_vkDestroyDebugReportCallbackEXT)
@@ -867,11 +874,11 @@ Ptr<Context> Context::create()
 bool isAvailable()
 {
     // create context to initialize the kDevice.
-    if (kDevice == VK_NULL_HANDLE)
+    if (kDevicePtr.empty())
     {
         Context::create();
     }
-    return kDevice != VK_NULL_HANDLE;
+    return !kDevicePtr.empty();
 }
 
 #endif // HAVE_VULKAN

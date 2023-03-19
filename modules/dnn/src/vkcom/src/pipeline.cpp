@@ -57,7 +57,7 @@ void Descriptor::writeBuffer(VkBuffer buffer, int bindIndex, size_t size, VkDevi
     writeSet.pBufferInfo     = &sourceInfo;
     writeSet.dstSet          = desSet;
 
-    vkUpdateDescriptorSets(kDevice, 1, &writeSet, 0, nullptr);
+    vkUpdateDescriptorSets(*kDevicePtr, 1, &writeSet, 0, nullptr);
 }
 
 Descriptor::~Descriptor()
@@ -65,8 +65,8 @@ Descriptor::~Descriptor()
     if (needRelease)
     {
         // destroy resource
-        vkFreeDescriptorSets(kDevice, desPool, 1, &desSet);
-        vkDestroyDescriptorPool(kDevice, desPool, nullptr);
+        vkFreeDescriptorSets(*kDevicePtr, desPool, 1, &desSet);
+        vkDestroyDescriptorPool(*kDevicePtr, desPool, nullptr);
     }
     else
     {
@@ -92,7 +92,7 @@ Pipeline::Pipeline(const uint32_t* spv, size_t length,
             /* .codeSize = */ length * sizeof(uint32_t),
             /* .pCode    = */ spv,
     };
-    VK_CHECK_RESULT(vkCreateShaderModule(kDevice, &shaderModuleCreateInfo, nullptr, &shaderModule));
+    VK_CHECK_RESULT(vkCreateShaderModule(*kDevicePtr, &shaderModuleCreateInfo, nullptr, &shaderModule));
 
     // Step2: according the bufferType info set the binding.
     std::vector<VkDescriptorSetLayoutBinding> bindings;
@@ -117,14 +117,14 @@ Pipeline::Pipeline(const uint32_t* spv, size_t length,
         setLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
         setLayoutCreateInfo.bindingCount = bindings.size();
         setLayoutCreateInfo.pBindings = &bindings[0];
-        VK_CHECK_RESULT(vkCreateDescriptorSetLayout(kDevice, &setLayoutCreateInfo, NULL, &setLayout));
+        VK_CHECK_RESULT(vkCreateDescriptorSetLayout(*kDevicePtr, &setLayoutCreateInfo, NULL, &setLayout));
 
         // Create PipelineLayout
         VkPipelineLayoutCreateInfo pipeline_layout_create_info = {};
         pipeline_layout_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         pipeline_layout_create_info.setLayoutCount = 1;
         pipeline_layout_create_info.pSetLayouts = &setLayout;
-        VK_CHECK_RESULT(vkCreatePipelineLayout(kDevice, &pipeline_layout_create_info, NULL, &pipelineLayout));
+        VK_CHECK_RESULT(vkCreatePipelineLayout(*kDevicePtr, &pipeline_layout_create_info, NULL, &pipelineLayout));
     }
 
     //Step: 4 create pipelineVk instance.
@@ -140,10 +140,10 @@ Pipeline::Pipeline(const uint32_t* spv, size_t length,
     pipelineCreateInfo.layout = pipelineLayout;
 
     cv::AutoLock lock(kContextMtx);
-    VK_CHECK_RESULT(vkCreateComputePipelines(kDevice, cache, 1, &pipelineCreateInfo, 0, &pipelineVK));
+    VK_CHECK_RESULT(vkCreateComputePipelines(*kDevicePtr, cache, 1, &pipelineCreateInfo, 0, &pipelineVK));
 
     // Step5: destroy shaderModule
-    vkDestroyShaderModule(kDevice, shaderModule, nullptr);
+    vkDestroyShaderModule(*kDevicePtr, shaderModule, nullptr);
 
     // Step6: add typeCount to desPoolSize
     for (auto& iter : typeCount)
@@ -188,7 +188,7 @@ Ptr<Descriptor> Pipeline::createSet()
     info.poolSizeCount = desPoolSize.size();
     info.pPoolSizes = desPoolSize.data();
     info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    VK_CHECK_RESULT(vkCreateDescriptorPool(kDevice, &info, NULL, &descriptorPool));
+    VK_CHECK_RESULT(vkCreateDescriptorPool(*kDevicePtr, &info, NULL, &descriptorPool));
 
     // Create DescriptorSet
     VkDescriptorSet descriptorSet;
@@ -197,7 +197,7 @@ Ptr<Descriptor> Pipeline::createSet()
     allocate_info.descriptorPool = descriptorPool;
     allocate_info.descriptorSetCount = 1;
     allocate_info.pSetLayouts = &setLayout;
-    VK_CHECK_RESULT(vkAllocateDescriptorSets(kDevice, &allocate_info, &descriptorSet));
+    VK_CHECK_RESULT(vkAllocateDescriptorSets(*kDevicePtr, &allocate_info, &descriptorSet));
 
     Ptr<Descriptor> descriptor = Descriptor::create(descriptorPool, descriptorSet, this);
     descriptor->needRelease = false; // Don't release and try to reuse it.
@@ -213,14 +213,14 @@ Pipeline::~Pipeline()
         descriptorPairQueue.pop();
 
         CV_Assert(iter.first && iter.second);
-        vkFreeDescriptorSets(kDevice, iter.first, 1, &iter.second);
-        vkDestroyDescriptorPool(kDevice, iter.first, nullptr);
+        vkFreeDescriptorSets(*kDevicePtr, iter.first, 1, &iter.second);
+        vkDestroyDescriptorPool(*kDevicePtr, iter.first, nullptr);
     }
 
     // Step2: destroy other resources.
-    vkDestroyPipelineLayout(kDevice, pipelineLayout, nullptr);
-    vkDestroyDescriptorSetLayout(kDevice, setLayout, nullptr);
-    vkDestroyPipeline(kDevice, pipelineVK, nullptr);
+    vkDestroyPipelineLayout(*kDevicePtr, pipelineLayout, nullptr);
+    vkDestroyDescriptorSetLayout(*kDevicePtr, setLayout, nullptr);
+    vkDestroyPipeline(*kDevicePtr, pipelineVK, nullptr);
 }
 
 // *********************** Pipeline Factory ********************
@@ -234,7 +234,7 @@ static VkResult createPipelineCache(VkPipelineCache& pipelineCache)
             /* .initialDataSize = */ 0,
             /* .pInitialData    = */ nullptr,
     };
-    return vkCreatePipelineCache(kDevice, &pipelineCacheInfo, nullptr, &pipelineCache);
+    return vkCreatePipelineCache(*kDevicePtr, &pipelineCacheInfo, nullptr, &pipelineCache);
 }
 
 PipelineFactory::PipelineFactory()
@@ -247,13 +247,13 @@ PipelineFactory::PipelineFactory()
 PipelineFactory::~PipelineFactory()
 {
     pipelineCreated.clear();
-    vkDestroyPipelineCache(kDevice, pipelineCache, nullptr);
+    vkDestroyPipelineCache(*kDevicePtr, pipelineCache, nullptr);
 }
 
 void PipelineFactory::reset()
 {
     // Step1: destroy old pipelineCache.
-    vkDestroyPipelineCache(kDevice, pipelineCache, nullptr);
+    vkDestroyPipelineCache(*kDevicePtr, pipelineCache, nullptr);
 
     // Step2: create new PipelineCache
     VK_CHECK_RESULT(createPipelineCache(pipelineCache));

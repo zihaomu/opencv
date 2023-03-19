@@ -148,6 +148,9 @@ class Context
 public:
     static Ptr<Context> create();
 
+    static VkQueue kQueue;
+    static VkDevice kDevice;
+
     void operator=(const Context &) = delete;
     Context(Context &other) = delete;
     ~Context(); // TODO deconstruct this class when net was deconstructed.

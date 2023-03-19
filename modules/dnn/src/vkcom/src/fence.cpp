@@ -16,7 +16,7 @@ Fence::Fence()
             /* .pNext = */ nullptr,
             /* .flags = */ 0,
     };
-    vkCreateFence(kDevice, &fci, nullptr, &fence);
+    vkCreateFence(*kDevicePtr, &fci, nullptr, &fence);
 }
 
 VkFence Fence::get() const
@@ -26,7 +26,7 @@ VkFence Fence::get() const
 
 VkResult Fence::reset() const
 {
-    return vkResetFences(kDevice, 1, &fence);
+    return vkResetFences(*kDevicePtr, 1, &fence);
 }
 
 VkResult Fence::wait() const
@@ -34,7 +34,7 @@ VkResult Fence::wait() const
     auto status = VK_TIMEOUT;
 
     do {
-        status = vkWaitForFences(kDevice, 1, &fence, VK_TRUE, 5000000000);
+        status = vkWaitForFences(*kDevicePtr, 1, &fence, VK_TRUE, 5000000000);
     } while (status == VK_TIMEOUT);
 
     return status;
@@ -42,7 +42,7 @@ VkResult Fence::wait() const
 
 Fence::~Fence()
 {
-    vkDestroyFence(kDevice, fence, nullptr);
+    vkDestroyFence(*kDevicePtr, fence, nullptr);
 }
 
 #endif // HAVE_VULKAN
