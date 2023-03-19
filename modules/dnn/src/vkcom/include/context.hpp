@@ -33,13 +33,14 @@ Below is the original copyright:
 
 #include "command.hpp"
 #include "pipeline.hpp"
+#include "../vulkan/vk_loader.hpp"
 
 namespace cv { namespace dnn { namespace vkcom {
 
 #ifdef HAVE_VULKAN
 
 // NOTE: Manually set true to enable ValidationLayers, default is false.
-const bool enableValidationLayers = false;
+const bool enableValidationLayers = true;
 
 enum GPU_TYPE {
     GPU_TYPE_NOFOUND = -1,
@@ -150,12 +151,16 @@ public:
 
     static VkQueue kQueue;
     static VkDevice kDevice;
+    static VulkanHandle handle;
 
     void operator=(const Context &) = delete;
     Context(Context &other) = delete;
     ~Context(); // TODO deconstruct this class when net was deconstructed.
     void reset();
+
 private:
+
+    void destroyResource();
     GPUInfo parseGPUInfo(VkPhysicalDevice& device);
 
     // The following function will create kInstance.

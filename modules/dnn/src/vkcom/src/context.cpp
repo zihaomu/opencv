@@ -211,6 +211,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debugReportCallbackFn(
 
 VkQueue Context::kQueue = VK_NULL_HANDLE;
 VkDevice Context::kDevice = VK_NULL_HANDLE;
+VulkanHandle Context::handle = nullptr;
 
 void Context::createInstance()
 {
@@ -345,14 +346,23 @@ void Context::createInstance()
         createInfo.pfnCallback = &debugReportCallbackFn;
 
         // Create and register callback.
-        VK_CHECK_RESULT(vkCreateDebugReportCallbackEXT(kInstance, &createInfo,
-                                                       NULL, &kDebugReportCallback));
+        auto func = (PFN_vkCreateDebugReportCallbackEXT)
+            vkGetInstanceProcAddr(kInstance, "vkCreateDebugReportCallbackEXT");
+
+        if (func == nullptr)
+        {
+            CV_LOG_FATAL(NULL, "Could not load vkCreateDebugReportCallbackEXT");
+        }
+        else
+        {
+            VK_CHECK_RESULT(func(kInstance, &createInfo, NULL, &kDebugReportCallback));
+        }
     }
 }
 
 Context::Context()
 {
-    if(!loadVulkanLibrary())
+    if(!loadVulkanLibrary(handle))
     {
         CV_Error(Error::StsError, "loadVulkanLibrary failed");
         return;
@@ -376,13 +386,13 @@ Context::Context()
     // Step1: create kInstance
     createInstance();
 
-    init_instance_extension(kInstance);
-
     if (!loadVulkanFunctions(kInstance))
     {
         CV_Error(Error::StsError, "loadVulkanFunctions failed");
         return;
     }
+
+    init_instance_extension(kInstance);
 
     // Step2: Find the best suitable Physical Device.
     uint32_t deviceCount = 0;
@@ -829,16 +839,20 @@ void Context::reset()
     pipelineFactoryPtr->reset();
 }
 
+void Context::destroyResource()
+{
+    vkDestroyDevice(kDevice, NULL);
+    vkDestroyInstance(kInstance, NULL);
+}
+
 Context::~Context()
 {
     if (cmdPoolPtr)
         cmdPoolPtr.release();
     if (pipelineFactoryPtr)
         pipelineFactoryPtr.release();
-
-    vkDestroyDevice(kDevice, NULL);
-    if (kDevicePtr)
-        kDevicePtr.release();
+    //if (kDevicePtr)
+    //    kDevicePtr.release();
 
     if (enableValidationLayers)
     {
@@ -854,7 +868,8 @@ Context::~Context()
             func(kInstance, kDebugReportCallback, NULL);
         }
     }
-    vkDestroyInstance(kInstance, NULL);
+
+    destroyResource();
 }
 
 static Ptr<Context> contextInstance = nullptr;
