@@ -512,13 +512,21 @@ void runFastConv(InputArray _input, OutputArray _output, const Ptr<FastConv>& co
 
     int stripes_per_sample = ((int)out_planesize + CONV_NR - 1) / CONV_NR;
 
+    bool separatedLoop = false;
     if (stripes_per_sample < ntasks * 4 && conv->conv_type != CONV_TYPE_DEPTHWISE_REMAIN)
     {
         MAX_STRIPES = 1;
         stripes_per_sample = 1;
+
+        if (N == 1) // separatedLoop only works on 1 batchsize.
+            separatedLoop = true;
     }
     else
+    {
+        // If stripes_per_sample is big, we parallelize on H0*W0.
         Kg_nblocks = 1;
+    }
+
 
     int Kstripes = Kg_nblocks*stripes_per_sample;
     int nsubtasks = N*ngroups*Kstripes;
@@ -536,6 +544,38 @@ void runFastConv(InputArray _input, OutputArray _output, const Ptr<FastConv>& co
     float* out = output.ptr<float>();
     float* fusedAddPtr0 = fusedAddMat.empty() ? 0 : fusedAddMat.ptr<float>();
 
+    if (separatedLoop)
+    {
+        // For now this branch only handles batch size = 1. Maybe we could support batch size < 10 in the future.
+        // Pack Input data first
+        parallel_for_(Range(0, ngroups * hw_task), [&](const Range& r0)
+        {
+            for (int nhwi = r0.start; nhwi < r0.end; nhwi++)
+            {
+                int g = nhwi/hw_task;
+                int hw_i = nhwi % hw_task;
+                int hw0 = hw_i * FAST_CONV_NR;
+                float* inpbuf = inpbuf_all + g * hw_aligned * HkWkCg + hw0 * HkWkCg;
+                const float* inptr = inp + g * Cg * inp_planesize;
+                bool partial0 = hw0 + FAST_CONV_NR > out_planesize? true: false;
+                int slice_len = FAST_CONV_NR;
+
+                if (partial0)
+                    slice_len = out_planesize - hw0;
+
+                packInput(inpbuf, inptr, yxtab, ksize, Cg, Hi, Wi, W0, pad_top, pad_left, stride_x, stride_y,
+                          hw0, slice_len, fast_1x1, partial0, s1d1p0, s1d1);
+            }
+        });
+
+        // Compute loop.
+    }
+    else
+    {
+
+    }
+
+    // In one parallel loop
     parallel_for_(Range(0, ntasks), [&](const Range& r0) {
     for (int task_id = r0.start; task_id < r0.end; task_id++)
     {
@@ -1016,7 +1056,8 @@ void runFastConv(InputArray _input, OutputArray _output, const Ptr<FastConv>& co
 
                     for (int k = k0_block; k < k1_block; k++,
                             cptr += ldc, outptr += out_planesize,
-                            pbptr += (pbptr ? out_planesize : 0)) {
+                            pbptr += (pbptr ? out_planesize : 0))
+                    {
                         float biasval = biasptr[k];
                         int j = 0;
 #if CV_SIMD128
