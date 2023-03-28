@@ -17,7 +17,8 @@ CV__DNN_INLINE_NS_BEGIN
 
 Ptr<BackendWrapper> Net::Impl::wrap(Mat& host)
 {
-    if (preferableBackend == DNN_BACKEND_OPENCV && preferableTarget == DNN_TARGET_CPU)
+    if (preferableBackend == DNN_BACKEND_OPENCV &&
+            (preferableTarget == DNN_TARGET_CPU || preferableTarget == DNN_TARGET_CPU_FP16))
         return Ptr<BackendWrapper>();
 
     MatShape shape(host.dims);
@@ -104,7 +105,7 @@ void Net::Impl::initBackend(const std::vector<LayerPin>& blobsToKeep_)
     CV_TRACE_FUNCTION();
     if (preferableBackend == DNN_BACKEND_OPENCV)
     {
-        CV_Assert(preferableTarget == DNN_TARGET_CPU || IS_DNN_OPENCL_TARGET(preferableTarget));
+        CV_Assert(preferableTarget == DNN_TARGET_CPU || preferableTarget == DNN_TARGET_CPU_FP16 || IS_DNN_OPENCL_TARGET(preferableTarget));
     }
     else if (preferableBackend == DNN_BACKEND_HALIDE)
     {
@@ -230,6 +231,14 @@ void Net::Impl::setPreferableTarget(int targetId)
             bool fp16 = ocl::Device::getDefault().isExtensionSupported("cl_khr_fp16");
             if (!fp16 && targetId == DNN_TARGET_OPENCL_FP16)
                 preferableTarget = DNN_TARGET_OPENCL;
+#endif
+        }
+
+        if (targetId == DNN_TARGET_CPU_FP16)
+        {
+#if !__arm64__
+            CV_LOG_WARNING(NULL, "DNN: fall back to DNN_TARGET_CPU. Only ARM v8 CPU is supported by DNN_TARGET_CPU_FP16.");
+            targetId == DNN_TARGET_CPU;
 #endif
         }
         clear();

@@ -10,8 +10,14 @@
 #ifndef CONV_PRAM
 #define CONV_PRAM
 #if CV_NEON && CV_NEON_AARCH64  // 32 registers.
-#define CONV_MR 4
-#define CONV_NR 28
+#define CONV_MR_FP32 4
+#define CONV_NR_FP32 28
+
+// Currently, only ARM 64 support FP16.
+#define CONV_ENABLE_FP16 1
+#define CONV_MR_FP16 8
+#define CONV_NR_FP16 24
+
 #elif CV_NEON              // 16 registers.
 #define CONV_MR 4
 #define CONV_NR 12
@@ -41,6 +47,11 @@ enum {
 #endif
 
     CONV_WINO_NATOMS_F32 = CONV_WINO_AREA / CONV_WINO_ATOM_F32, // for AVX2, it is 8, otherwise, it's 16.
+
+#if CONV_ENABLE_FP16
+    CONV_WINO_ATOM_F16 = CONV_WINO_ATOM_F32 * 2,
+    CONV_WINO_NATOMS_F16 = CONV_WINO_AREA / CONV_WINO_ATOM_F16,
+#endif
 };
 
 // NOTE that: CONV_TYPE_DEPTHWISE is for 3x3 depthwise conv, and others depthwise will be set as CONV_TYPE_DEPTHWISE_REMAIN.
@@ -64,8 +75,17 @@ struct FastConv
     std::vector<float> weightsWinoBuf; // For Winograd F(6x6, 3x3).
     float* weightsWinoBufPtr;
     std::vector<float> biasBuf;
+
+#if CONV_ENABLE_FP16
+    std::vector<float16_t> weightsBuf_FP16;
+    float16_t* weightsBufPtr_FP16;
+    std::vector<float16_t> weightsWinoBuf_FP16;
+    float16_t* weightsWinoBufPtr_FP16;
+#endif
+
     int conv_type;
     int conv_dim;  // Flag for conv1d, conv2d, or conv3d.
+    bool useFP16 = false; // Only ARMv8 is supported.
 #if CV_SIMD128
     bool useSIMD128 = true;
 #else
@@ -95,6 +115,7 @@ Ptr<FastConv> initFastConv(
         const std::vector<size_t>& pads_begin,
         const std::vector<size_t>& pads_end,
         int conv_dim,
+        const bool useFP16,
         bool useWinograd);
 
 // It contains different computing branches, like winograd, 1x1 conv.
