@@ -48,7 +48,7 @@ enum {
 
     CONV_WINO_NATOMS_F32 = CONV_WINO_AREA / CONV_WINO_ATOM_F32, // for AVX2, it is 8, otherwise, it's 16.
 
-#if CONV_ENABLE_FP16
+#if defined(CONV_ENABLE_FP16) && CONV_ENABLE_FP16
     CONV_WINO_ATOM_F16 = CONV_WINO_ATOM_F32 * 2,
     CONV_WINO_NATOMS_F16 = CONV_WINO_AREA / CONV_WINO_ATOM_F16,
 #endif
@@ -76,7 +76,7 @@ struct FastConv
     float* weightsWinoBufPtr;
     std::vector<float> biasBuf;
 
-#if CONV_ENABLE_FP16
+#if defined(CONV_ENABLE_FP16) && CONV_ENABLE_FP16
     std::vector<float16_t> weightsBuf_FP16;
     float16_t* weightsBufPtr_FP16;
     std::vector<float16_t> weightsWinoBuf_FP16;

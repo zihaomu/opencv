@@ -597,7 +597,6 @@ void convBlockMR1_F32(int np, const float * a, const float * b, float *c, const 
         }
     }
 
-
     if (init_c)
     {
         c0 += vld1q_f32(c);

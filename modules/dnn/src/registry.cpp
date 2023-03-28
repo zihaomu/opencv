@@ -62,7 +62,7 @@ private:
 #endif
 
         bool haveBackendCPU_FP16 = false;
-#if __arm64__
+#if defined(__arm64__) && __arm64__
         haveBackendCPU_FP16 = true;
 #endif
 
