@@ -13,17 +13,24 @@
 #define CONV_MR_FP32 4
 #define CONV_NR_FP32 28
 
+// The FP16 can only be supported by ARM64 and with FP16 FMA supported.
+#ifdef __ARM_FEATURE_FP16_VECTOR_ARITHMETIC // check FP16 FMA.
+#define CONV_ARM_FP16 1
+#endif
+
+#ifdef CONV_ARM_FP16
 // Currently, only ARM 64 support FP16.
-#define CONV_ENABLE_FP16 1
 #define CONV_MR_FP16 8
 #define CONV_NR_FP16 24
+typedef __fp16 float16_t; // Fix conflict between float16_t in arm_neon.h and float16_t in cvdef.h.
+#endif
 
 #elif CV_NEON              // 16 registers.
-#define CONV_MR 4
-#define CONV_NR 12
+#define CONV_MR_FP32 4
+#define CONV_NR_FP32 12
 #else // SIMD 128, AVX or AVX2
-#define CONV_MR 4
-#define CONV_NR 24
+#define CONV_MR_FP32 4
+#define CONV_NR_FP32 24
 #endif
 
 // Winograd Params
@@ -48,10 +55,9 @@ enum {
 
     CONV_WINO_NATOMS_F32 = CONV_WINO_AREA / CONV_WINO_ATOM_F32, // for AVX2, it is 8, otherwise, it's 16.
 
-#if defined(CONV_ENABLE_FP16) && CONV_ENABLE_FP16
+    // FP 16
     CONV_WINO_ATOM_F16 = CONV_WINO_ATOM_F32 * 2,
     CONV_WINO_NATOMS_F16 = CONV_WINO_AREA / CONV_WINO_ATOM_F16,
-#endif
 };
 
 // NOTE that: CONV_TYPE_DEPTHWISE is for 3x3 depthwise conv, and others depthwise will be set as CONV_TYPE_DEPTHWISE_REMAIN.
@@ -76,7 +82,7 @@ struct FastConv
     float* weightsWinoBufPtr;
     std::vector<float> biasBuf;
 
-#if defined(CONV_ENABLE_FP16) && CONV_ENABLE_FP16
+#if CV_NEON && CV_NEON_AARCH64 && CV_FP16
     std::vector<float16_t> weightsBuf_FP16;
     float16_t* weightsBufPtr_FP16;
     std::vector<float16_t> weightsWinoBuf_FP16;

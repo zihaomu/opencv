@@ -180,7 +180,7 @@ TEST_P(Reproducibility_AlexNet, Accuracy)
 #else
     applyTestTag(targetId == DNN_TARGET_CPU ? CV_TEST_TAG_MEMORY_512MB : CV_TEST_TAG_MEMORY_1GB);
 #endif
-    ASSERT_TRUE(ocl::useOpenCL() || targetId == DNN_TARGET_CPU);
+    ASSERT_TRUE(ocl::useOpenCL() || targetId == DNN_TARGET_CPU || targetId == DNN_TARGET_CPU_FP16);
 
     bool readFromMemory = get<0>(GetParam());
     Net net;
@@ -375,7 +375,7 @@ TEST_P(Reproducibility_ResNet50, Accuracy)
 {
     Target targetId = GetParam();
     applyTestTag(targetId == DNN_TARGET_CPU ? CV_TEST_TAG_MEMORY_512MB : CV_TEST_TAG_MEMORY_1GB);
-    ASSERT_TRUE(ocl::useOpenCL() || targetId == DNN_TARGET_CPU);
+    ASSERT_TRUE(ocl::useOpenCL() || targetId == DNN_TARGET_CPU || targetId == DNN_TARGET_CPU_FP16);
 
     Net net = readNetFromCaffe(findDataFile("dnn/ResNet-50-deploy.prototxt"),
                                findDataFile("dnn/ResNet-50-model.caffemodel", false));

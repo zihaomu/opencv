@@ -234,13 +234,14 @@ void Net::Impl::setPreferableTarget(int targetId)
 #endif
         }
 
+#if !defined(__arm64__) || !__arm64__
         if (targetId == DNN_TARGET_CPU_FP16)
         {
-#if !defined(__arm64__) || !__arm64__
             CV_LOG_WARNING(NULL, "DNN: fall back to DNN_TARGET_CPU. Only ARM v8 CPU is supported by DNN_TARGET_CPU_FP16.");
-            targetId == DNN_TARGET_CPU;
-#endif
+            targetId = DNN_TARGET_CPU;
         }
+#endif
+
         clear();
     }
 }
