@@ -367,7 +367,7 @@ Context::Context()
         CV_Error(Error::StsError, "loadVulkanLibrary failed");
         return;
     }
-    else if (!loadVulkanEntry())
+    else if (!loadVulkanEntry(handle))
     {
         CV_Error(Error::StsError, "loadVulkanEntry failed");
         return;
@@ -837,6 +837,11 @@ void Context::reset()
 {
     cmdPoolPtr->reset();
     pipelineFactoryPtr->reset();
+
+    // TODEL
+    vkDestroyDevice(kDevice, NULL);
+    vkDestroyInstance(kInstance, NULL);
+    // 尝试在这里是放掉vkdevice。
 }
 
 void Context::destroyResource()
