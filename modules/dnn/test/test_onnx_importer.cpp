@@ -104,6 +104,28 @@ TEST_P(Test_ONNX_layers, MaxPooling)
 #endif
     testONNXModels("maxpooling", npy, 0, 0, false, false);
 }
+
+        Mat randomMat(std::vector<int> sizeMat)
+        {
+            Mat result(sizeMat, CV_32FC1);
+            float low = -100.0;
+            float high = +100.0;
+            randu(result, Scalar(low), Scalar(high));
+            return result;
+        }
+
+TEST_P(Test_ONNX_layers, MooTest)
+{
+    Net net = readNet("/Users/zihao/work/issue_tracker/models/yolov8n-pose_sim.onnx");
+//    Net net = readNet("/Users/zihao/work/issue_tracker/models/best640.onnx");
+
+    std::vector<int> sizeM = {1, 3, 640, 640};
+    Mat blob = randomMat(sizeM);
+    net.setInput(blob);
+    Mat out = net.forward();
+    std::cout<<"got forward "<<std::endl;
+}
+
 TEST_P(Test_ONNX_layers, MaxPooling_2)
 {
     testONNXModels("two_maxpooling", npy, 0, 0, false, false);
@@ -1126,6 +1148,8 @@ TEST_P(Test_ONNX_layers, Split)
     testONNXModels("split_2");
     testONNXModels("split_3");
     testONNXModels("split_4");
+    testONNXModels("split_5");
+    testONNXModels("split_6");
     testONNXModels("split_neg_axis");
 }
 

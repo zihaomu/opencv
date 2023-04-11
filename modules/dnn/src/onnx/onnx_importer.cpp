@@ -373,6 +373,7 @@ void runLayer(LayerParams& params, const std::vector<Mat>& inputs,
               std::vector<Mat>& outputs)
 {
     Ptr<Layer> layer = LayerFactory::createLayerInstance(params.type, params);
+    if (!(bool)layer)
     CV_Assert((bool)layer);
 
     std::vector<MatShape> inpShapes(inputs.size());
@@ -1462,6 +1463,10 @@ void ONNXImporter::parseSlice(LayerParams& layerParams, const opencv_onnx::NodeP
 
 void ONNXImporter::parseSplit(LayerParams& layerParams, const opencv_onnx::NodeProto& node_proto)
 {
+    int axis = layerParams.get<int>("axis", 0);
+    MatShape inpShape = outShapes[node_proto.input(0)];
+    axis = normalize_axis(axis, inpShape.size());
+
     if (layerParams.has("split"))
     {
         DictValue splits = layerParams.get("split");
@@ -1475,13 +1480,26 @@ void ONNXImporter::parseSplit(LayerParams& layerParams, const opencv_onnx::NodeP
         }
         layerParams.set("slice_point", DictValue::arrayInt(&slicePoints[0], slicePoints.size()));
     }
+    else if (node_proto.input_size() == 2) // opset >= 13, the split will be stored at the second input, instead of the attribute.
+    {
+        CV_Assert(constBlobs.find(node_proto.input(1)) != constBlobs.end());
+        Mat splitsBlob = getBlob(node_proto, 1);
+        int splitSize = splitsBlob.total();
+
+        std::vector<int> slicePoints(splitSize - 1, splitsBlob.at<int>(0));
+        for (int i = 1; i < splitSize - 1; ++i)
+        {
+            slicePoints[i] = slicePoints[i - 1] + splitsBlob.at<int>(i);
+        }
+        layerParams.set("slice_point", DictValue::arrayInt(&slicePoints[0], slicePoints.size()));
+    }
     else
     {
         layerParams.set("num_split", node_proto.output_size());
     }
     int depth = layerParams.get<int>("depth", CV_32F);
     layerParams.type = (depth == CV_8S) ? "SliceInt8" : "Slice";
-    layerParams.set("axis", layerParams.get<float>("axis", 0));
+    layerParams.set("axis", axis);
     addLayer(layerParams, node_proto);
 }
 
@@ -2970,7 +2988,7 @@ void ONNXImporter::parseCumSum(LayerParams& layerParams, const opencv_onnx::Node
     addLayer(layerParams, node_proto);
 }
 
-// "Equal" "Greater" "Less" "Pow" "Add" "Sub" "Mul" "Div" "Sum" "Min" "Max" "GreaterOrEqual" "LessOrEqual"
+// "Equal" "Greater" "Less" "Pow" "Add" "Sub" "Mul" "Div" "Sum" "Min" "Max" "GreaterOrEqual" "LessOrEqual" "where"
 void ONNXImporter::parseElementWise(LayerParams& layerParams, const opencv_onnx::NodeProto& node_proto_)
 {
     opencv_onnx::NodeProto node_proto = node_proto_;
@@ -4046,6 +4064,7 @@ void ONNXImporter::buildDispatchMap_ONNX_AI(int opset_version)
             dispatch["LessOrEqual"] = &ONNXImporter::parseElementWise;
 
     dispatch["Sum"] = dispatch["Min"] = dispatch["Max"] = &ONNXImporter::parseElementWise;
+    dispatch["Where"] = &ONNXImporter::parseElementWise;
     dispatch["Range"] = &ONNXImporter::parseRange;
 
     std::vector<std::string> simpleLayers{"Acos", "Acosh", "Asin", "Asinh", "Atan", "Atanh", "Ceil", "Celu", "Cos",

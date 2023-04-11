@@ -106,6 +106,7 @@ static void computeShapeByReshapeMask(const MatShape &srcShape,
         {
             srcRange.start -= 1;
         }
+        if (!(total(srcShape, srcRange.start, srcRange.end) == maskTotal))
         CV_Assert(total(srcShape, srcRange.start, srcRange.end) == maskTotal);
     }
 
