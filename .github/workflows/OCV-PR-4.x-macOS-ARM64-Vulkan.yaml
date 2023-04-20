@@ -20,6 +20,7 @@ env:
   OPENCV_TEST_DATA_PATH: '${{ github.workspace }}/opencv_extra/testdata'
   GTEST_FILTER_STRING: '-GOTURN.accuracy:DaSiamRPN.accuracy:NanoTrack.accuracy_NanoTrack_V2'
   OPENCV_VULKAN_RUNTIME: '/opt/VulkanSDK/1.3.239.0/MoltenVK/dylib/macOS/libMoltenVK.dylib'
+  DNN_MODELS: '/Users/opencv-cn/Workspace/opencv-ci/dnn_models'
 
 jobs:
   BuildAndTest:
