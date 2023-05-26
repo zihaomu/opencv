@@ -13,6 +13,8 @@
 #include <iostream>
 #include <numeric>
 
+#include "cpu_kernels/convolution.hpp"
+
 namespace cv
 {
 namespace dnn
@@ -155,7 +157,6 @@ public:
     virtual void fuseWeights(const Mat& w_, const Mat& b_, const float& new_sc) = 0;
 };
 
-//TODO: simultaneously convolution and bias addition for cache optimization
 class ConvolutionLayerInt8Impl CV_FINAL : public BaseConvolutionLayerInt8Impl
 {
 public:
@@ -165,6 +166,7 @@ public:
     std::vector<float> outputMultiplier;
     Mat activationLUT;
     Ptr<ActivationLayerInt8> activ;
+    Ptr<FastQConv> fastQConvImpl;
 
     ConvolutionLayerInt8Impl(const LayerParams &params) : BaseConvolutionLayerInt8Impl(params){}
 
@@ -1381,13 +1383,75 @@ public:
         int ngroups = inputs[0].size[1] / inpGroupCn;
         CV_Assert(outputs[0].size[1] % ngroups == 0);
 
-        int nstripes = std::max(getNumThreads(), 1);
+        // TODEL
+        int nstripes = 4; //std::max(getNumThreads(), 1);
+
+        // TODO! remove the outputInt32, and directly set it to int8.
         Mat outputInt32 = Mat(shape(outputs[0]), CV_32S);
 
-        ParallelConv::run(inputs[0], outputInt32, weightsMat, outputMultiplier, biasvec, activationLUT, kernel_size, strides,
-                          pads_begin, pads_end, dilations, activ.get(), ngroups, nstripes, input_zp, output_zp);
+        int conv_dim = CONV_2D;
+        if (inputs[0].dims == 3)
+            conv_dim = CONV_1D;
+        if (inputs[0].dims == 5)
+            conv_dim = CONV_3D;
 
-        outputInt32.convertTo(outputs[0], CV_8S);
+        // TODEL
+//        char* p = inputs[0].ptr<char>();
+//        MatShape shapeP = shape(inputs[0]);
+//        std::cout<<"print input"<<std::endl;
+//
+//        for (int i = 0; i < shapeP[1]; i++)
+//        {
+////            auto a = inputs[0].step1();
+//            char* p0 = p + 100 * i;
+//            for (int h = 0; h < shapeP[2]; h++)
+//            {
+//                for (int w = 0; w < shapeP[3]; w++)
+//                {
+//                    std::cout<<","<<(int)p0[h * shapeP[3] + w];
+//                }
+//                std::cout<<std::endl;
+//            }
+//            std::cout<<std::endl;
+//        }
+
+        // Initialization of FastQCovn, pack weight.
+        if (1)
+        {
+            if (!fastQConvImpl)
+            {
+                int K = outputs[0].size[1];
+                int C = inputs[0].size[1];
+
+                CV_Assert(outputs[0].size[1] % ngroups == 0);
+                fastQConvImpl = initFastQConv(weightsMat, &biasvec[0], ngroups, K, C, kernel_size, strides, dilations,
+                                              pads_begin, pads_end, conv_dim, outputMultiplier, input_sc, input_zp,
+                                              output_sc, output_zp, per_channel);
+            }
+
+            runFastQConv(inputs[0], outputs[0], fastQConvImpl, nstripes, activ);
+        }
+        else
+        {
+            ParallelConv::run(inputs[0], outputInt32, weightsMat, outputMultiplier, biasvec, activationLUT, kernel_size, strides,
+                              pads_begin, pads_end, dilations, activ.get(), ngroups, nstripes, input_zp, output_zp);
+
+            outputInt32.convertTo(outputs[0], CV_8S);
+        }
+
+        // TODEL
+//        MatShape aShape = shape(outputs[0]);
+//        std::cout<<"print output"<<std::endl;
+//        char* pt = outputs[0].ptr<char>();
+//        for (int i = 0; i < aShape[1]; i++)
+//        {
+//            char* pt0 = pt + i * aShape[2] * aShape[3];
+//            for (int hw = 0; hw < aShape[2] * aShape[3]; hw++)
+//            {
+//                std::cout<<","<<(int)pt0[hw];
+//            }
+//            std::cout<<std::endl;
+//        }
 
 #if CV_SSE3
         _MM_SET_FLUSH_ZERO_MODE(ftzMode);

@@ -844,6 +844,8 @@ void Net::Impl::forwardLayer(LayerData& ld)
         tm.stop();
         int64 t = tm.getTimeTicks();
         layersTimings[ld.id] = (t > 0) ? t : t + 1;  // zero for skipped layers only
+        // TODEL
+//        std::cout<<"ld name = "<<ld.name<<", time = "<<layersTimings[ld.id]<<std::endl;
     }
     else
     {

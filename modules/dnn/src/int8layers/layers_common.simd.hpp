@@ -108,65 +108,6 @@ void fastConv( const int8_t* weights, size_t wstep, const int* bias,
                     vs20 = _mm256_setzero_si256(), vs21 = _mm256_setzero_si256(),
                     vs22 = _mm256_setzero_si256(), vs23 = _mm256_setzero_si256();
 
-            /* TODO : Fix AVX-512 path. Segmentation fault in Conv2D Tests.
-#if CV_AVX512_SKX // AVX512VL is necessary to avoid register spilling
-            if (vecsize >= 64)
-            {
-                __m512i vs00_5 = _mm512_setzero_si512(), vs01_5 = _mm512_setzero_si512(),
-                        vs02_5 = _mm512_setzero_si512(), vs03_5 = _mm512_setzero_si512(),
-                        vs10_5 = _mm512_setzero_si512(), vs11_5 = _mm512_setzero_si512(),
-                        vs12_5 = _mm512_setzero_si512(), vs13_5 = _mm512_setzero_si512(),
-                        vs20_5 = _mm512_setzero_si512(), vs21_5 = _mm512_setzero_si512(),
-                        vs22_5 = _mm512_setzero_si512(), vs23_5 = _mm512_setzero_si512();
-
-                for (; k <= vecsize - 64; k += 64, rptr += 64)
-                {
-                    __m512i w0 = _mm512_load_si512(wptr0 + k);
-                    __m512i w1 = _mm512_load_si512(wptr1 + k);
-                    __m512i w2 = _mm512_load_si512(wptr2 + k);
-                    __m512i r0 = _mm512_load_si512(rptr);
-
-                    vs00_5 = _mm512_fmaddepi8_epi32(w0, r0, vs00_5);
-                    vs10_5 = _mm512_fmaddepi8_epi32(w1, r0, vs10_5);
-                    vs20_5 = _mm512_fmaddepi8_epi32(w2, r0, vs20_5);
-
-                    r0 = _mm512_load_si512(rptr + vecsize_aligned);
-                    vs01_5 = _mm512_fmaddepi8_epi32(w0, r0, vs01_5);
-                    vs11_5 = _mm512_fmaddepi8_epi32(w1, r0, vs11_5);
-                    vs21_5 = _mm512_fmaddepi8_epi32(w2, r0, vs21_5);
-
-                    r0 = _mm512_load_si512(rptr + vecsize_aligned*2);
-                    vs02_5 = _mm512_fmaddepi8_epi32(w0, r0, vs02_5);
-                    vs12_5 = _mm512_fmaddepi8_epi32(w1, r0, vs12_5);
-                    vs22_5 = _mm512_fmaddepi8_epi32(w2, r0, vs22_5);
-
-                    r0 = _mm512_load_si512(rptr + vecsize_aligned*3);
-                    vs03_5 = _mm512_fmaddepi8_epi32(w0, r0, vs03_5);
-                    vs13_5 = _mm512_fmaddepi8_epi32(w1, r0, vs13_5);
-                    vs23_5 = _mm512_fmaddepi8_epi32(w2, r0, vs23_5);
-                }
-
-                // now fold the 512 bit accumulator vectors into 256 bit vectors so that the AVX2 code can finish
-                // the tail of the vector
-
-                vs00 = _mm256_add_epi32( _mm512_extracti32x8_epi32(vs00_5, 0), _mm512_extracti32x8_epi32(vs00_5, 1));
-                vs10 = _mm256_add_epi32( _mm512_extracti32x8_epi32(vs10_5, 0), _mm512_extracti32x8_epi32(vs10_5, 1));
-                vs20 = _mm256_add_epi32( _mm512_extracti32x8_epi32(vs20_5, 0), _mm512_extracti32x8_epi32(vs20_5, 1));
-
-                vs01 = _mm256_add_epi32( _mm512_extracti32x8_epi32(vs01_5, 0), _mm512_extracti32x8_epi32(vs01_5, 1));
-                vs11 = _mm256_add_epi32( _mm512_extracti32x8_epi32(vs11_5, 0), _mm512_extracti32x8_epi32(vs11_5, 1));
-                vs21 = _mm256_add_epi32( _mm512_extracti32x8_epi32(vs21_5, 0), _mm512_extracti32x8_epi32(vs21_5, 1));
-
-                vs02 = _mm256_add_epi32( _mm512_extracti32x8_epi32(vs02_5, 0), _mm512_extracti32x8_epi32(vs02_5, 1));
-                vs12 = _mm256_add_epi32( _mm512_extracti32x8_epi32(vs12_5, 0), _mm512_extracti32x8_epi32(vs12_5, 1));
-                vs22 = _mm256_add_epi32( _mm512_extracti32x8_epi32(vs22_5, 0), _mm512_extracti32x8_epi32(vs22_5, 1));
-
-                vs03 = _mm256_add_epi32( _mm512_extracti32x8_epi32(vs03_5, 0), _mm512_extracti32x8_epi32(vs03_5, 1));
-                vs13 = _mm256_add_epi32( _mm512_extracti32x8_epi32(vs13_5, 0), _mm512_extracti32x8_epi32(vs13_5, 1));
-                vs23 = _mm256_add_epi32( _mm512_extracti32x8_epi32(vs23_5, 0), _mm512_extracti32x8_epi32(vs23_5, 1));
-            }
-#endif
-            */
             for (; k < vecsize; k += 32, rptr += 32 )
             {
                 __m256i w0 = _mm256_load_si256((const __m256i*)(wptr0 + k));
@@ -555,7 +496,7 @@ void fastDepthwiseConv( const int8_t* wptr,
             out = (int)imgptr0[in_j0]*w00*s0 + (int)imgptr0[in_j1]*w01*s1 + (int)imgptr0[in_j2]*w02*s2 +
                   (int)imgptr1[in_j0]*w10*s0 + (int)imgptr1[in_j1]*w11*s1 + (int)imgptr1[in_j2]*w12*s2 +
                   (int)imgptr2[in_j0]*w20*s0 + (int)imgptr2[in_j1]*w21*s1 + (int)imgptr2[in_j2]*w22*s2 + biasCopy;
-            outptr[out_j] = std::min(std::max(outZp + (int)std::round(out*mult), -128), 127);
+            outptr[out_j] = (int8_t)std::min(std::max(outZp + (int)std::round(out*mult), -128), 127);
         }
     }
     _mm256_zeroupper();

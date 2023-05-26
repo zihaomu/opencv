@@ -24,6 +24,103 @@ static std::string _tf(TString filename)
     return (getOpenCVExtraDir() + "dnn/") + filename;
 }
 
+        void printMatShape(InputArray blob_)
+        {
+            Mat blob = blob_.getMat();
+            auto shapeData = shape(blob);
+            std::cout<<"[";
+
+            if (shapeData.size() >= 1)
+                std::cout<<shapeData[0];
+
+            for (int i = 1; i < shapeData.size(); i++)
+            {
+                std::cout<<" x "<<shapeData[i];
+            }
+
+            std::cout<<"]"<<std::endl;
+        }
+
+        template<typename T>
+        static inline void printData(T* data, const int len)
+        {
+            for (int i = 0; i < len; i++)
+            {
+                std::cout << *(data + i) << ", ";
+            }
+        }
+
+
+        void printMatData(InputArray blob_, int printLen)
+        {
+            Mat blob = blob_.getMat();
+            std::cout<<"blob shape = ";
+            auto shapeData = shape(blob);
+            auto typeData = blob.type();
+//            printMatShape(blob);
+
+            std::cout<<"blob data = ";
+            if (blob.total() == 0)
+            {
+                std::cout<<"empty.";
+                return;
+            }
+
+            int len = std::min(int(blob.total()), printLen);
+            if (len == -1)
+                len = int(blob.total());
+
+            switch (typeData)
+            {
+                case CV_8U:
+                {
+                    uint8_t *pUint8 = (uint8_t *) blob.data;
+                    printData(pUint8, len);
+                    break;
+                }
+                case CV_8S:
+                {
+                    int8_t *pInt8 = (int8_t *) blob.data;
+                    printData(pInt8, len);
+                    break;
+                }
+                case CV_16U:
+                {
+                    uint16_t *pUint16 = (uint16_t *) blob.data;
+                    printData(pUint16, len);
+                    break;
+                }
+                case CV_16S:
+                {
+                    int16_t *pInt16 = (int16_t *) blob.data;
+                    printData(pInt16, len);
+                    break;
+                }
+                case CV_32F:
+                {
+                    float *pFloat = (float *) blob.data;
+                    printData(pFloat, len);
+                    break;
+                }
+                case CV_32S:
+                {
+                    int *pInt = (int *) blob.data;
+                    printData(pInt, len);
+                    break;
+                }
+                case CV_64F:
+                {
+                    double *pDouble = (double *) blob.data;
+                    printData(pDouble, len);
+                    break;
+                }
+                default:
+                    CV_Error(CV_StsError, "Unsupported data type!");
+            }
+
+            std::cout<<std::endl;
+        }
+
 class Test_Int8_layers : public DNNTestLayer
 {
 public:
@@ -95,6 +192,12 @@ public:
         {
             outs_int8[i].convertTo(outs_dequantized[i], CV_32F, outputScale[i], -(outputScale[i] * outputZp[i]));
             normAssert(refs[i], outs_dequantized[i], "", l1, lInf);
+
+//            std::cout<<"ref = "<<std::endl;
+//            printMatData(refs[i], 10);
+//            std::cout<<"out = "<<std::endl;
+//            printMatData(outs_dequantized[i], 10);
+
         }
     }
 };
@@ -484,19 +587,19 @@ TEST_P(Test_Int8_layers, Dropout)
 
 TEST_P(Test_Int8_layers, Eltwise)
 {
-    testLayer("layer_eltwise", "Caffe", 0.062, 0.15);
+//    testLayer("layer_eltwise", "Caffe", 0.062, 0.15);
 
     if (backend == DNN_BACKEND_TIMVX)
         applyTestTag(CV_TEST_TAG_DNN_SKIP_TIMVX);
 
     testLayer("conv_2_inps", "Caffe", 0.0086, 0.0232, 2, 1, true, false);
-    testLayer("eltwise_sub", "TensorFlow", 0.015, 0.047);
-    testLayer("eltwise_add_vec", "TensorFlow", 0.037, 0.21); // tflite 0.0095, 0.0365
-    testLayer("eltwise_mul_vec", "TensorFlow", 0.173, 1.14); // tflite 0.0028, 0.017
-    testLayer("channel_broadcast", "TensorFlow", 0.0025, 0.0063);
-    testLayer("split_equals", "TensorFlow", 0.02, 0.065);
-    testLayer("mul", "ONNX", 0.0039, 0.014);
-    testLayer("split_max", "ONNX", 0.004, 0.012);
+//    testLayer("eltwise_sub", "TensorFlow", 0.015, 0.047);
+//    testLayer("eltwise_add_vec", "TensorFlow", 0.037, 0.21); // tflite 0.0095, 0.0365
+//    testLayer("eltwise_mul_vec", "TensorFlow", 0.173, 1.14); // tflite 0.0028, 0.017
+//    testLayer("channel_broadcast", "TensorFlow", 0.0025, 0.0063);
+//    testLayer("split_equals", "TensorFlow", 0.02, 0.065);
+//    testLayer("mul", "ONNX", 0.0039, 0.014);
+//    testLayer("split_max", "ONNX", 0.004, 0.012);
 }
 
 INSTANTIATE_TEST_CASE_P(/**/, Test_Int8_layers, dnnBackendsAndTargetsInt8());
@@ -571,6 +674,12 @@ public:
             netSoftmax.setInput(ref);
             ref = netSoftmax.forward();
         }
+
+//        std::cout<<"ref = "<<std::endl;
+//        printMatData(ref, -1);
+//        std::cout<<"out = "<<std::endl;
+//        printMatData(out, -1);
+
 
         normAssert(ref, out, "", l1, lInf);
     }

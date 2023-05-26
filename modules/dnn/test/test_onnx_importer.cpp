@@ -16,6 +16,102 @@ static std::string _tf(TString filename, bool required = true)
 {
     return findDataFile(std::string("dnn/onnx/") + filename, required);
 }
+        void printMatShape(InputArray blob_)
+        {
+            Mat blob = blob_.getMat();
+            auto shapeData = shape(blob);
+            std::cout<<"[";
+
+            if (shapeData.size() >= 1)
+                std::cout<<shapeData[0];
+
+            for (int i = 1; i < shapeData.size(); i++)
+            {
+                std::cout<<" x "<<shapeData[i];
+            }
+
+            std::cout<<"]"<<std::endl;
+        }
+
+        template<typename T>
+        static inline void printData(T* data, const int len)
+        {
+            for (int i = 0; i < len; i++)
+            {
+                std::cout << *(data + i) << ", ";
+            }
+        }
+
+
+        void printMatData(InputArray blob_, int printLen)
+        {
+            Mat blob = blob_.getMat();
+            std::cout<<"blob shape = ";
+            auto shapeData = shape(blob);
+            auto typeData = blob.type();
+//            printMatShape(blob);
+
+            std::cout<<"blob data = ";
+            if (blob.total() == 0)
+            {
+                std::cout<<"empty.";
+                return;
+            }
+
+            int len = std::min(int(blob.total()), printLen);
+            if (len == -1)
+                len = int(blob.total());
+
+            switch (typeData)
+            {
+                case CV_8U:
+                {
+                    uint8_t *pUint8 = (uint8_t *) blob.data;
+                    printData(pUint8, len);
+                    break;
+                }
+                case CV_8S:
+                {
+                    int8_t *pInt8 = (int8_t *) blob.data;
+                    printData(pInt8, len);
+                    break;
+                }
+                case CV_16U:
+                {
+                    uint16_t *pUint16 = (uint16_t *) blob.data;
+                    printData(pUint16, len);
+                    break;
+                }
+                case CV_16S:
+                {
+                    int16_t *pInt16 = (int16_t *) blob.data;
+                    printData(pInt16, len);
+                    break;
+                }
+                case CV_32F:
+                {
+                    float *pFloat = (float *) blob.data;
+                    printData(pFloat, len);
+                    break;
+                }
+                case CV_32S:
+                {
+                    int *pInt = (int *) blob.data;
+                    printData(pInt, len);
+                    break;
+                }
+                case CV_64F:
+                {
+                    double *pDouble = (double *) blob.data;
+                    printData(pDouble, len);
+                    break;
+                }
+                default:
+                    CV_Error(CV_StsError, "Unsupported data type!");
+            }
+
+            std::cout<<std::endl;
+        }
 
 class Test_ONNX_layers : public DNNTestLayer
 {
@@ -89,6 +185,36 @@ public:
             net.setInput(inps[i], inputNames[i]);
         Mat out = net.forward("");
 
+
+        cv::TickMeter ticker;
+        std::vector<double> times;
+        for (int i = 0; i < 1000; i++)
+        {
+            ticker.reset();
+            ticker.start();
+            Mat out = net.forward("");
+
+            ticker.stop();
+
+
+            std::cout<<"net time = "<<ticker.getTimeMilli()<<std::endl;
+            std::cout<<std::endl;
+            std::cout<<std::endl;
+            times.push_back(ticker.getTimeMilli());
+            if ((i+1)%100 == 0)
+            {
+                sort(times.begin(), times.end());
+                std::cout<<"i = "<<i<<", min times = " <<times[0]<<std::endl;
+            }
+        }
+        sort(times.begin(), times.end());
+        double sum_of_elems = 0.0;
+        for(std::vector<double>::iterator it = times.begin(); it != times.end(); ++it)
+            sum_of_elems += *it;
+
+        std::cout<<"all min times = " <<times[0]<<std::endl;
+        std::cout<<"all mean times = " <<sum_of_elems/times.size()<<std::endl;
+
         if (useSoftmax)
         {
             LayerParams lp;
@@ -102,6 +228,13 @@ public:
             netSoftmax.setInput(ref);
             ref = netSoftmax.forward();
         }
+
+
+        std::cout<<"ref = "<<std::endl;
+        printMatData(ref, -1);
+        std::cout<<"out = "<<std::endl;
+        printMatData(out, -1);
+
         normAssert(ref, out, "", l1 ? l1 : default_l1, lInf ? lInf : default_lInf);
         if (checkNoFallbacks)
             expectNoFallbacksFromIE(net);
