@@ -13,7 +13,6 @@ namespace cv
 {
 namespace dnn
 {
-
 #ifdef HAVE_HALIDE
 static void applySplit(const FileNode& directive, Halide::Func& func,
                        const FileNode& params)
