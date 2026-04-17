@@ -1,1 +1,1 @@
-Origin: https://github.com/google/flatbuffers/tree/v23.1.21
+Origin: https://github.com/google/flatbuffers/tree/v25.9.23
