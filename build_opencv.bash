@@ -4,6 +4,8 @@ cmake -DWITH_EIGEN=OFF \
     -DWITH_CAROTENE=OFF \
     -DWITH_IPP=OFF \
     -DWITH_KLEIDICV=OFF \
+    -DBUILD_opencv_imgcodecs=OFF \
+    -DENABLE_LIBJPEG_TURBO_SIMD=OFF \
     ..
 
 make -j8
