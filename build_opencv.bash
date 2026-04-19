@@ -5,7 +5,7 @@ cmake -DWITH_EIGEN=OFF \
     -DWITH_IPP=OFF \
     -DWITH_KLEIDICV=OFF \
     -DBUILD_opencv_imgcodecs=OFF \
-    -DENABLE_LIBJPEG_TURBO_SIMD=OFF \
+    -DWITH_JPEG=OFF \
     ..
 
 make -j8
